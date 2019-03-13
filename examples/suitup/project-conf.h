@@ -69,4 +69,6 @@
 #define COAP_OBSERVE_CLIENT            1
 #endif /* COAP_OBSERVE_CLIENT */
 
+#define LOG_CONF_LEVEL_COAP LOG_LEVEL_DBG
+
 #endif /* PROJECT_ERBIUM_CONF_H_ */
