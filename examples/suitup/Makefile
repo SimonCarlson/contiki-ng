@@ -1,4 +1,4 @@
-all: coap-example-server coap-example-client
+all: update-server update-client
 # use target "plugtest-server" explicitly when required
 
 CONTIKI=../..
