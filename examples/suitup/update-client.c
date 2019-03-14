@@ -51,7 +51,7 @@
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
-#define SERVER_EP "coap://[fe80::212:7402:0002:0202]"
+#define SERVER_EP "coap://[fe80::201:1:1:1]"
 
 #define TOGGLE_INTERVAL 10
 
@@ -60,14 +60,6 @@ AUTOSTART_PROCESSES(&er_example_client);
 
 static struct etimer et;
 
-/* Example URIs that can be queried. */
-#define NUMBER_OF_URLS 4
-/* leading and ending slashes only for demo purposes, get cropped automatically when setting the Uri-Path */
-char *service_urls[NUMBER_OF_URLS] =
-{ ".well-known/core", "/actuators/toggle", "battery/", "error/in//path" };
-#if PLATFORM_HAS_BUTTON
-static int uri_switch = 0;
-#endif
 
 /* This function is will be passed to COAP_BLOCKING_REQUEST() to handle responses. */
 void
@@ -87,26 +79,22 @@ PROCESS_THREAD(er_example_client, ev, data)
   static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
   coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+  coap_endpoint_print(&server_ep);
 
   /* receives all CoAP messages */
   coap_engine_init();
 
   etimer_set(&et, TOGGLE_INTERVAL * CLOCK_SECOND);
 
-#if PLATFORM_HAS_BUTTON
-  SENSORS_ACTIVATE(button_sensor);
-  printf("Press a button to request %s\n", service_urls[uri_switch]);
-#endif
-
   while(1) {
     PROCESS_YIELD();
 
     if(etimer_expired(&et)) {
       printf("--Toggle timer--\n");
-
+      coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
       /* prepare request, TID is set by COAP_BLOCKING_REQUEST() */
-      coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
-      coap_set_header_uri_path(request, service_urls[1]);
+      coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
+      coap_set_header_uri_path(request, ".well-known/core");
 
       const char msg[] = "Toggle!";
 
@@ -120,27 +108,6 @@ PROCESS_THREAD(er_example_client, ev, data)
       printf("\n--Done--\n");
 
       etimer_reset(&et);
-
-#if PLATFORM_HAS_BUTTON
-    } else if(ev == sensors_event && data == &button_sensor) {
-
-      /* send a request to notify the end of the process */
-
-      coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
-      coap_set_header_uri_path(request, service_urls[uri_switch]);
-
-      printf("--Requesting %s--\n", service_urls[uri_switch]);
-
-      LOG_INFO_COAP_EP(&server_ep);
-      LOG_INFO_("\n");
-
-      COAP_BLOCKING_REQUEST(&server_ep, request,
-                            client_chunk_handler);
-
-      printf("\n--Done--\n");
-
-      uri_switch = (uri_switch + 1) % NUMBER_OF_URLS;
-#endif
     }
   }
 
