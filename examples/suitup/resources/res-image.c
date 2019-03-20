@@ -10,7 +10,7 @@
 #define PRINTF(...)
 #endif
 
-static void res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
+static void res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
 /*
  * A handler function named [resource name]_handler must be implemented for each RESOURCE.
@@ -18,18 +18,18 @@ static void res_register_handler(coap_message_t *request, coap_message_t *respon
  * preferred_size and offset, but must respect the REST_MAX_CHUNK_SIZE limit for the buffer.
  * If a smaller block size is requested for CoAP, the REST framework automatically splits the data.
  */
-RESOURCE(res_register,
+RESOURCE(res_image,
          "title=\"Hello world: ?len=0..\";rt=\"Text\"",
-         res_register_handler,
-         res_register_handler,  // POST handler
+         res_image_handler,
+         NULL,
          NULL,
          NULL);
 
 static void
-res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
+res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-  PRINTF("REGISTER RESOURCE\n");
-  const char *vendor_id, *class_id, *version;
+  PRINTF("IMAGE RESOURCE\n");
+  const char *vendor_id = NULL;
   //const char *class_id = NULL;
   //const char *version = NULL;
   /* Some data that has the length up to REST_MAX_CHUNK_SIZE. For more, see the chunk resource. */
@@ -37,14 +37,8 @@ res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   int length = 12; /*           |<-------->| */
 
   if(coap_get_query_variable(request, "vid", &vendor_id)) {
-    printf("Vendor id: %s\n", vendor_id);
+    printf("Vendor id: %s", vendor_id);
     //memcpy(buffer, vendor_id, length);
-  }
-  if(coap_get_query_variable(request, "cid", &class_id)) {
-    printf("Class id: %s\n", class_id);
-  }
-  if(coap_get_query_variable(request, "v", &version)) {
-    printf("Version: %s\n", version);
   }
 
   memcpy(buffer, message, length);

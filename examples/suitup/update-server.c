@@ -54,7 +54,7 @@
  * Resources to be activated need to be imported through the extern keyword.
  * The build system automatically compiles the resources in the corresponding sub-directory.
  */
-extern coap_resource_t res_hello, res_register;
+extern coap_resource_t res_hello, res_register, res_manifest, res_image;
 
 PROCESS(er_example_server, "Erbium Example Server");
 AUTOSTART_PROCESSES(&er_example_server);
@@ -81,6 +81,8 @@ PROCESS_THREAD(er_example_server, ev, data)
    */
   coap_activate_resource(&res_hello, "test/hello");
   coap_activate_resource(&res_register, "update/register");
+  coap_activate_resource(&res_manifest, "update/manifest");
+  coap_activate_resource(&res_image, "update/image");
 
   /* Define application-specific events here. */
   while(1) {
