@@ -69,6 +69,9 @@
 #define COAP_OBSERVE_CLIENT            1
 #endif /* COAP_OBSERVE_CLIENT */
 
+#define COAP_DTLS_PSK_DEFAULT_IDENTITY "user"
+#define COAP_DTLS_PSK_DEFAULT_KEY "pass"
+
 #define LOG_CONF_LEVEL_COAP LOG_LEVEL_DBG
 
 #endif /* PROJECT_ERBIUM_CONF_H_ */
