@@ -39,13 +39,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "contiki.h"
 #include "contiki-net.h"
 #include "coap-engine.h"
 #include "coap-blocking-api.h"
+#include "coap-keystore-simple.h"
+#include "rpl.h"
 //#include "coap-callback-api.h"
-#include "dev/button-sensor.h"
-#include <unistd.h>
 
 /* Log configuration */
 #include "coap-log.h"
@@ -54,7 +55,7 @@
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
 #define SERVER_EP "coap://[fe80::201:1:1:1]"
-#define VENDOR_ID "7473889aee98fffdcd1876"
+#define VENDOR_ID "74738ff5536759589aee98fffdcd1876"
 #define CLASS_ID "28718ff5930282177ccc14aefbcd1276"
 #define VERSION "1.0"
 #define INTERVAL 4
@@ -108,18 +109,24 @@ update_handler(coap_message_t *response)
 
 PROCESS_THREAD(update_client, ev, data)
 {
+  static struct etimer et;
   coap_endpoint_t server_ep;
   PROCESS_BEGIN();
-
   static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
-  coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
-  coap_endpoint_print(&server_ep);
+  //coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+  //coap_endpoint_print(&server_ep);
   /* receives all CoAP messages */
   coap_engine_init();
+  coap_keystore_simple_init();
+
+  etimer_set(&et, CLOCK_SECOND * INTERVAL);
+  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
     printf("Send packet to update/register\n");
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+    int res = coap_endpoint_is_connected(&server_ep);
+    printf("CONNECT RESULT: %d\n", res);
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
 
@@ -132,9 +139,6 @@ PROCESS_THREAD(update_client, ev, data)
     printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
     LOG_INFO_COAP_EP(&server_ep);
     LOG_INFO_("\n");
-
-    printf("Sleeping\n");
-    //sleep(4);
 
     COAP_BLOCKING_REQUEST(&server_ep, request, client_chunk_handler);
     printf("Registration done\n");

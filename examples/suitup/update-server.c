@@ -41,6 +41,9 @@
 #include <string.h>
 #include "contiki.h"
 #include "coap-engine.h"
+#include "coap-keystore-simple.h"
+#include "rpl.h"
+#include "rpl-dag-root.h"
 
 #define DEBUG 1
 #if DEBUG
@@ -71,6 +74,7 @@ PROCESS_THREAD(er_example_server, ev, data)
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("CoAP max chunk: %u\n", COAP_MAX_CHUNK_SIZE);
 
+  rpl_dag_root_init_dag_immediately();
   /* Initialize the REST engine. */
   coap_engine_init();
 
@@ -83,6 +87,8 @@ PROCESS_THREAD(er_example_server, ev, data)
   coap_activate_resource(&res_register, "update/register");
   coap_activate_resource(&res_manifest, "update/manifest");
   coap_activate_resource(&res_image, "update/image");
+
+  coap_keystore_simple_init();
 
   /* Define application-specific events here. */
   while(1) {
