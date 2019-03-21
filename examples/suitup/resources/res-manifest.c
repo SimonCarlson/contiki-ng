@@ -19,7 +19,7 @@ static void res_manifest_handler(coap_message_t *request, coap_message_t *respon
  * If a smaller block size is requested for CoAP, the REST framework automatically splits the data.
  */
 RESOURCE(res_manifest,
-         "title=\"Hello world: ?len=0..\";rt=\"Text\"",
+         "title=\"Update manifest",
          res_manifest_handler,
          NULL,
          NULL,

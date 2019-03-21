@@ -19,7 +19,7 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
  * If a smaller block size is requested for CoAP, the REST framework automatically splits the data.
  */
 RESOURCE(res_image,
-         "title=\"Hello world: ?len=0..\";rt=\"Text\"",
+         "title=\"Update image",
          res_image_handler,
          NULL,
          NULL,

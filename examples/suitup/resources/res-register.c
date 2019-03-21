@@ -19,7 +19,7 @@ static void res_register_handler(coap_message_t *request, coap_message_t *respon
  * If a smaller block size is requested for CoAP, the REST framework automatically splits the data.
  */
 RESOURCE(res_register,
-         "title=\"Hello world: ?len=0..\";rt=\"Text\"",
+         "title=\"Update registration",
          res_register_handler,
          res_register_handler,  // POST handler
          NULL,
