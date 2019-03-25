@@ -1,0 +1,28 @@
+{
+    "versionID": 1,
+    "sequenceNumber": 1,
+    "preConditions": [
+        {
+            "type": 0,
+            "UUID": "74738ff5-5367-5958-9aee-98fffdcd1876"
+        },
+        {
+            "type": 1,
+            "UUID": "28718ff5-9302-8217-7ccc-14aefbcd1276"
+        }
+    ],
+    "postConditions": [],
+    "contentKeyMethod": 0,
+    "payloadInfo": {
+        "format": 0,
+        "size": 512,
+        "storage": 0,
+        "URLdigest": [{
+            "URL": "coaps://fake-url",
+            "digest": "6b6bf0bce018a46a263151f7f662c2f94125f39ba68b48160ee222853201a863"
+        }]
+    },
+    "precursorImage": [{}],
+    "dependencies": [{}],
+    "options": [{}]
+}
