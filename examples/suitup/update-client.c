@@ -55,8 +55,8 @@
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
 #define SERVER_EP "coap://[fe80::201:1:1:1]"
-#define VENDOR_ID "74738ff5536759589aee98fffdcd1876"
-#define CLASS_ID "28718ff5930282177ccc14aefbcd1276"
+#define VENDOR_ID "74738ff5-53675958-9aee98ff-fdcd1876"
+#define CLASS_ID "28718ff5-93028217-7ccc14ae-fbcd1276"
 #define VERSION "1.0"
 #define INTERVAL 4
 #define TIMEOUT 1
@@ -69,7 +69,6 @@ PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
 
-/* This function is will be passed to COAP_BLOCKING_REQUEST() to handle responses. */
 void
 client_chunk_handler(coap_message_t *response)
 {
@@ -78,7 +77,7 @@ client_chunk_handler(coap_message_t *response)
 
   int len = coap_get_payload(response, &chunk);
 
-  printf("Response: %.*s", len, (char *)chunk);
+  printf("Response: %.*s\n", len, (char *)chunk);
 }
 
 
@@ -91,7 +90,7 @@ manifest_parser(coap_message_t *response)
   int len = coap_get_payload(response, &chunk);
   strncpy(image_url, "update/image", strlen("update/image"));
 
-  printf("Response: %.*s", len, (char *)chunk);
+  printf("Response: %.*s\n", len, (char *)chunk);
 }
 
 
@@ -103,7 +102,7 @@ update_handler(coap_message_t *response)
 
   int len = coap_get_payload(response, &chunk);
 
-  printf("Response: %.*s", len, (char *)chunk);
+  printf("Response: %.*s\n", len, (char *)chunk);
 }
 
 
@@ -125,16 +124,17 @@ PROCESS_THREAD(update_client, ev, data)
 
     printf("Send packet to update/register\n");
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
-    int res = coap_endpoint_is_connected(&server_ep);
-    printf("CONNECT RESULT: %d\n", res);
+    printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
+    coap_endpoint_connect(&server_ep);
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
 
     // const char msg[] = "Toggle!";
-    // coap_set_payload(request, (uint8_t *)msg, sizeof(msg) - 1);
+    //snprintf(query_data, sizeof(query_data) - 1, "%s&%s&%s", VENDOR_ID, CLASS_ID, VERSION);
+    //coap_set_payload(request, (uint8_t *)query_data, sizeof(query_data) - 1);
 
     // Copy POST data into buffer
-    snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", "VENDOR_ID", "CLASS_ID", "VERSION");
+    snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     int bytes = coap_set_header_uri_query(request, query_data); 
     printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
     LOG_INFO_COAP_EP(&server_ep);
@@ -143,6 +143,7 @@ PROCESS_THREAD(update_client, ev, data)
     COAP_BLOCKING_REQUEST(&server_ep, request, client_chunk_handler);
     printf("Registration done\n");
 
+    // For some reason the endpoint address changes if it is not parsed again
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");

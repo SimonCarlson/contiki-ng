@@ -77,6 +77,7 @@ PROCESS_THREAD(er_example_server, ev, data)
   rpl_dag_root_init_dag_immediately();
   /* Initialize the REST engine. */
   coap_engine_init();
+  coap_keystore_simple_init();
 
   /*
    * Bind the resources to their Uri-Path.
@@ -87,8 +88,6 @@ PROCESS_THREAD(er_example_server, ev, data)
   coap_activate_resource(&res_register, "update/register");
   coap_activate_resource(&res_manifest, "update/manifest");
   coap_activate_resource(&res_image, "update/image");
-
-  coap_keystore_simple_init();
 
   /* Define application-specific events here. */
   while(1) {
