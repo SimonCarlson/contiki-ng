@@ -36,8 +36,8 @@
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#ifndef PROJECT_ERBIUM_CONF_H_
-#define PROJECT_ERBIUM_CONF_H_
+#ifndef IOT_UPDATES_PROJECT_CONF
+#define IOT_UPDATES_PROJECT_CONF
 
 /* Custom channel and PAN ID configuration for your project. */
 /* #define RF_CHANNEL                    26 */
@@ -50,7 +50,7 @@
 #define COAP_MAX_CHUNK_SIZE           48
 
 /* Estimate your header size, especially when using Proxy-Uri. */
-/* #define COAP_MAX_HEADER_SIZE          70 */
+#define COAP_MAX_HEADER_SIZE          128
 
 /* Multiplies with chunk size, be aware of memory constraints. */
 #ifndef COAP_MAX_OPEN_TRANSACTIONS
@@ -74,4 +74,4 @@
 
 #define LOG_CONF_LEVEL_COAP LOG_LEVEL_DBG
 
-#endif /* PROJECT_ERBIUM_CONF_H_ */
+#endif /* IOT_UPDATES_PROJECT_CONF */
