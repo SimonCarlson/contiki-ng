@@ -74,7 +74,8 @@ PROCESS_THREAD(er_example_server, ev, data)
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("CoAP max chunk: %u\n", COAP_MAX_CHUNK_SIZE);
 
-  rpl_dag_root_init_dag_immediately();
+  //rpl_dag_root_init_dag_immediately();  // When on the develop branch (newer network stack)
+  rpl_dag_root_start();   // When on the oscore_12 branch (older network stack)
   /* Initialize the REST engine. */
   coap_engine_init();
   coap_keystore_simple_init();
