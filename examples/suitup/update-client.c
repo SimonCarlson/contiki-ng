@@ -95,9 +95,9 @@ manifest_parser(coap_message_t *response)
 
 
 void
-update_handler(coap_message_t *response)
+image_handler(coap_message_t *response)
 {
-  printf("UPDATE CALLBACK\n");
+  printf("IMAGE CALLBACK\n");
   const uint8_t *chunk;
 
   int len = coap_get_payload(response, &chunk);
@@ -153,7 +153,7 @@ PROCESS_THREAD(update_client, ev, data)
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, image_url);
-    COAP_BLOCKING_REQUEST(&server_ep, request, update_handler);
+    COAP_BLOCKING_REQUEST(&server_ep, request, image_handler);
     printf("Image done\n");
 
     printf("\n--Done--\n");
