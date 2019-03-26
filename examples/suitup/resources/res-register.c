@@ -2,6 +2,10 @@
 #include <string.h>
 #include "coap-engine.h"
 
+#include "coap-log.h"
+#define LOG_MODULE "client"
+#define LOG_LEVEL  LOG_LEVEL_COAP
+
 #define DEBUG 1
 #if DEBUG
 #include <stdio.h>
@@ -29,7 +33,7 @@ static void
 res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("REGISTER RESOURCE\n");
-  const char *vendor_id, *class_id, *version;
+  const char *vendor_id;
   //const char *class_id = NULL;
   //const char *version = NULL;
   /* Some data that has the length up to REST_MAX_CHUNK_SIZE. For more, see the chunk resource. */
@@ -40,13 +44,10 @@ res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t 
     printf("Vendor id: %s\n", vendor_id);
     //memcpy(buffer, vendor_id, length);
   }
-  if(coap_get_query_variable(request, "cid", &class_id)) {
-    printf("Class id: %s\n", class_id);
-  }
-  if(coap_get_query_variable(request, "v", &version)) {
-    printf("Version: %s\n", version);
-  }
 
+  printf("Vendor id: %s\n", vendor_id);
+
+  coap_set_status_code(response, CREATED_2_01);
   memcpy(buffer, message, length);
   coap_set_header_content_format(response, TEXT_PLAIN); /* text/plain is the default, hence this option could be omitted. */
   coap_set_header_etag(response, (uint8_t *)&length, 1);
