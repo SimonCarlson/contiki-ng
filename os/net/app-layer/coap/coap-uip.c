@@ -537,6 +537,7 @@ get_psk_info(struct dtls_context_t *ctx,
   memset(&ks, 0, sizeof(ks));
   LOG_DBG("---===>>> Getting the Key or ID <<<===---\n");
   switch(type) {
+  case DTLS_PSK_HINT:
   case DTLS_PSK_IDENTITY:
     if(id && id_len) {
       ks.identity_hint = id;
