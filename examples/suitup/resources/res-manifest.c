@@ -51,7 +51,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   //bytes = fread((char*)buffer, 1, preferred_size, fd);
   
   static int end = 0;
-  if(strlen(manifest) < *offset) {
+  if(*offset > strlen(manifest)) {
     strncpy((char*)buffer, manifest + *offset, *offset - strlen(manifest));  
     end = 1;
   } else {
