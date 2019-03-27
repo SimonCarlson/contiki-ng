@@ -55,22 +55,28 @@
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
 #define SERVER_EP "coap://[fe80::201:1:1:1]"
+//#define SERVER_EP "coap://[fd00::302:304:506:708]"
 #define VENDOR_ID "74738ff5-53675958-9aee98ff-fdcd1876"
 #define CLASS_ID "28718ff5-93028217-7ccc14ae-fbcd1276"
 #define VERSION "1.0"
-#define INTERVAL 4
+#define INTERVAL 1
 #define TIMEOUT 1
 
+// TODO: Optimize, size of IDs known
 static char query_data[128]; /* allocate some data for queries and updates */
 //static coap_request_state_t rd_request_state;
+// TODO: Must be some upper bound for URLs
 static char image_url[128];
+// TODO: Assumption, fix dynamically?
+static char manifest_buffer[451];
+static int manifest_offset = 0;
 
 PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
 
 void
-client_chunk_handler(coap_message_t *response)
+register_callback(coap_message_t *response)
 {
   printf("REGISTER CALLBACK\n");
   const uint8_t *chunk;
@@ -82,20 +88,21 @@ client_chunk_handler(coap_message_t *response)
 
 
 void
-manifest_parser(coap_message_t *response)
+manifest_callback(coap_message_t *response)
 {
   printf("MANIFEST CALLBACK\n");
   const uint8_t *chunk;
 
-  int len = coap_get_payload(response, &chunk);
-  strncpy(image_url, "update/image", strlen("update/image"));
-
-  printf("Response: %.*s\n", len, (char *)chunk);
+  coap_get_payload(response, &chunk);
+  int copied_bytes = strlen((char *)chunk);
+  strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
+  manifest_offset += copied_bytes;
+  printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
 }
 
 
 void
-image_handler(coap_message_t *response)
+image_callback(coap_message_t *response)
 {
   printf("IMAGE CALLBACK\n");
   const uint8_t *chunk;
@@ -105,11 +112,15 @@ image_handler(coap_message_t *response)
   printf("Response: %.*s\n", len, (char *)chunk);
 }
 
+void
+manifest_parser() {
+  strncpy(image_url, "update/image", strlen("update/image"));
+}
 
 PROCESS_THREAD(update_client, ev, data)
 {
   static struct etimer et;
-  coap_endpoint_t server_ep;
+  static coap_endpoint_t server_ep;
   PROCESS_BEGIN();
   static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
@@ -140,22 +151,21 @@ PROCESS_THREAD(update_client, ev, data)
     LOG_INFO_COAP_EP(&server_ep);
     LOG_INFO_("\n");
 
-    COAP_BLOCKING_REQUEST(&server_ep, request, client_chunk_handler);
+    COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
     printf("Registration done\n");
 
-    // For some reason the endpoint address changes if it is not parsed again
-    coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
-    COAP_BLOCKING_REQUEST(&server_ep, request, manifest_parser);
+    COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
+    manifest_parser();
     printf("Manifest done\n");
 
-    coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, image_url);
-    COAP_BLOCKING_REQUEST(&server_ep, request, image_handler);
+    COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
     printf("Image done\n");
-
+    printf("MANIFEST: %s\n", manifest_buffer);
+    printf("MANIFEST LENGTH: %ld\n", strlen(manifest_buffer));
     printf("\n--Done--\n");
 
   PROCESS_END();
