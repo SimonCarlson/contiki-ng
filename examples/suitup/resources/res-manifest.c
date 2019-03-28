@@ -26,14 +26,14 @@ RESOURCE(res_manifest,
          NULL);
 
 #define CHUNKS_TOTAL 2050 // How to determine? Size of file? 
-char *manifest= "{\"0\": 1, \"1\": \"1553761697\", \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"coaps://fake.uri\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [{}], \"7\": [{}], \"8\": [{}]}";
+char *manifest= "{\"0\": 1, \"1\": \"1553762654\", \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [{}], \"7\": [{}], \"8\": [{}]}";
 
 static void
 res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("MANIFEST RESOURCE\n");
   int32_t strpos = 0;
-  printf("OFFSET: %d\n", *offset);
+  printf("OFFSET: %ld\n", *offset);
   if(*offset >= CHUNKS_TOTAL) {
     coap_set_status_code(response, BAD_OPTION_4_02);
     const char *error_msg = "BlockOutOfScope";
