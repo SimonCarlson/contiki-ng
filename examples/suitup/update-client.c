@@ -54,10 +54,10 @@
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
-#define SERVER_EP "coap://[fe80::201:1:1:1]"
+#define SERVER_EP "coaps://[fe80::201:1:1:1]"
 //#define SERVER_EP "coap://[fd00::302:304:506:708]"
-#define VENDOR_ID "74738ff5-53675958-9aee98ff-fdcd1876"
-#define CLASS_ID "28718ff5-93028217-7ccc14ae-fbcd1276"
+#define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
+#define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
 #define INTERVAL 1
 #define TIMEOUT 1
@@ -97,7 +97,7 @@ manifest_callback(coap_message_t *response)
   int copied_bytes = strlen((char *)chunk);
   strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
   manifest_offset += copied_bytes;
-  printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
+  printf("Response: %s length: %d\n", (char *)chunk, strlen((char *)chunk));
 }
 
 
@@ -165,7 +165,7 @@ PROCESS_THREAD(update_client, ev, data)
     COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
     printf("Image done\n");
     printf("MANIFEST: %s\n", manifest_buffer);
-    printf("MANIFEST LENGTH: %ld\n", strlen(manifest_buffer));
+    printf("MANIFEST LENGTH: %d\n", strlen(manifest_buffer));
     printf("\n--Done--\n");
 
   PROCESS_END();
