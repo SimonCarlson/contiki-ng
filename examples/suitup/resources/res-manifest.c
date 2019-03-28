@@ -26,7 +26,7 @@ RESOURCE(res_manifest,
          NULL);
 
 #define CHUNKS_TOTAL 2050 // How to determine? Size of file? 
-char *manifest= "{\"versionID\": 1,\"sequenceNumber\": 1,\"preConditions\": [{\"type\": 0,\"UUID\": \"74738ff5-5367-5958-9aee-98fffdcd1876\"},{\"type\": 1,\"UUID\": \"28718ff5-9302-8217-7ccc-14aefbcd1276\"}],\"postConditions\": [],\"contentKeyMethod\": 0,\"payloadInfo\": {\"format\": 0,\"size\": 512,\"storage\": 0,\"URLdigest\": [{\"URL\": \"coaps://fake-url\",\"digest\": \"6b6bf0bce018a46a263151f7f662c2f94125f39ba68b48160ee222853201a863\"}]},\"precursorImage\": [{}],\"dependencies\": [{}],\"options\": [{}]}";
+char *manifest= "{\"0\": 1, \"1\": \"1553761697\", \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"coaps://fake.uri\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [{}], \"7\": [{}], \"8\": [{}]}";
 
 static void
 res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
