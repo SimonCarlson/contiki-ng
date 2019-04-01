@@ -20,6 +20,7 @@ void main() {
     char *cur_pos = manifest_buffer;
     int key;
     char *val;
+    // Traverse the manifest
     while(*cur_pos != '\0') {
         key = get_next_key(&cur_pos);
         switch(key) {
@@ -27,6 +28,7 @@ void main() {
                 // VERSION ID
                 val = get_next_value(&cur_pos);
                 manifest.versionID = atoi(val);
+                free(val);
                 break;
             case 1:
                 // SEQUENCE NUMBER
@@ -153,6 +155,7 @@ int get_next_key(char **buffer) {
             (*buffer)++;
         }
     }
+    return -1;
 }
 
 char *get_next_value(char **buffer) {
