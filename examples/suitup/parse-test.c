@@ -46,7 +46,7 @@ void main() {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 preConditions.value = val;
-                free(val);
+                //free(val);
 
                 // Second pair (class id)
                 key = get_next_key(&cur_pos);
@@ -56,7 +56,7 @@ void main() {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 nextPreCondition.value = val;
-                free(val);
+                //free(val);
 
                 preConditions.next = &nextPreCondition;
                 manifest.preConditions = &preConditions;
@@ -102,13 +102,13 @@ void main() {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 URLDigest.URL = val;
-                free(val);
+                //free(val);
 
                 // digest
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 URLDigest.digest = val;
-                free(val);
+                //free(val);
 
                 URLDigest.next = NULL;
                 payloadInfo.URLDigest = &URLDigest;
