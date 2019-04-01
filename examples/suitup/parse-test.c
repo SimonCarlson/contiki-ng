@@ -1,49 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "parse-test.h"
 
-char *manifest_buffer = "{\"0\":0, \"1\": 123456, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": []}"; //, \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [{}], \"7\": [{}], \"8\": [{}]}";
-
-int get_next_key(char**);
-char *get_next_value(char**);
-int is_digit(char*);
-
-typedef struct manifest_s {
-    int versionID;
-    int sequenceNumber;
-    struct condition_s *preConditions;
-    struct condition_s *postConditions;
-    int contentKeyMethod;
-    struct payloadInfo_s *payloadInfo;
-    struct URLDigest_s *precursorImage;
-    struct URLDigest_s *dependencies;
-    struct option_s *options;
-} manifest_t;
-
-typedef struct condition_s {
-    int type;
-    char *value;
-    struct condition_s *next;
-} condition_t;
-
-typedef struct payloadInfo_s {
-    int format;
-    int size;
-    int storage;
-    struct URLDigest_s *URLDigest;
-} payloadInfo_t;
-
-typedef struct URLDigest_s {
-    char *URL;
-    char *digest;
-    struct URLDigest_s *next;
-} URLDigest_t;
-
-typedef struct option_s {
-    int type;
-    char *value;
-    struct option_s *next;
-} option_t;
+char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 
 void main() {
     manifest_t manifest;
@@ -53,55 +13,50 @@ void main() {
     condition_t postConditions;
     payloadInfo_t payloadInfo;
     URLDigest_t URLDigest;
-    URLDigest_t *precursorImage;
-    URLDigest_t *dependencies;
-    option_t *options;
+    URLDigest_t precursorImage;
+    URLDigest_t dependencies;
+    option_t options;
 
     char *cur_pos = manifest_buffer;
     int key;
-    char *ret;
-    while(*cur_pos != '\0' && strlen(cur_pos) != 0) {
-        //printf("%s\n", cur_pos);
+    char *val;
+    while(*cur_pos != '\0') {
         key = get_next_key(&cur_pos);
         switch(key) {
             case 0:
                 // VERSION ID
-                ret = get_next_value(&cur_pos);
-                manifest.versionID = atoi(ret);
+                val = get_next_value(&cur_pos);
+                manifest.versionID = atoi(val);
                 break;
             case 1:
                 // SEQUENCE NUMBER
-                ret = get_next_value(&cur_pos);
-                manifest.sequenceNumber = atoi(ret);
+                val = get_next_value(&cur_pos);
+                manifest.sequenceNumber = atoi(val);
                 break;
             case 2:
                 // PRECONDITIONS
-                // First pair
+                // First pair (vendor id)
                 key = get_next_key(&cur_pos);
-                ret = get_next_value(&cur_pos);
-                preConditions.type = atoi(ret);
-                printf("1. Key: %d. Value: %s\n", key, ret);
+                val = get_next_value(&cur_pos);
+                preConditions.type = atoi(val);
                 key = get_next_key(&cur_pos);
-                ret = get_next_value(&cur_pos);
-                preConditions.value = ret;
-                printf("2. Key: %d. Value: %s\n", key, ret);
+                val = get_next_value(&cur_pos);
+                preConditions.value = val;
 
-                // Second pair
+                // Second pair (class id)
                 key = get_next_key(&cur_pos);
-                ret = get_next_value(&cur_pos);
-                nextPreCondition.type = atoi(ret);
-                printf("1. Key: %d. Value: %s\n", key, ret);
+                val = get_next_value(&cur_pos);
+                nextPreCondition.type = atoi(val);
                 key = get_next_key(&cur_pos);
-                ret = get_next_value(&cur_pos);
-                nextPreCondition.value = ret;
-                printf("2. Key: %d. Value: %s\n", key, ret);
+                val = get_next_value(&cur_pos);
+                nextPreCondition.value = val;
 
                 preConditions.next = &nextPreCondition;
                 manifest.preConditions = &preConditions;
                 break;
             case 3:
                 // POSTCONDITIONS
-                ret = get_next_value(&cur_pos);
+                val = get_next_value(&cur_pos);
                 postConditions.type = -1;
                 postConditions.value = NULL;
                 postConditions.next = NULL;
@@ -109,23 +64,67 @@ void main() {
                 break;
             case 4:
                 // CONTENT KEY METHOD
-                ret = get_next_value(&cur_pos);
-                manifest.contentKeyMethod = atoi(ret);
+                val = get_next_value(&cur_pos);
+                manifest.contentKeyMethod = atoi(val);
                 break;
             case 5:
                 // PAYLOAD INFO
+                // Format
+                key = get_next_key(&cur_pos);
+                val = get_next_value(&cur_pos);
+                payloadInfo.format = atoi(val);
+
+                // Size
+                key = get_next_key(&cur_pos);
+                val = get_next_value(&cur_pos);
+                payloadInfo.size = atoi(val);
+
+                // Storage
+                key = get_next_key(&cur_pos);
+                val = get_next_value(&cur_pos);
+                payloadInfo.storage = atoi(val);
+
+                // Start of URLDigest, skip its key
+                get_next_key(&cur_pos);
+                // URL
+                key = get_next_key(&cur_pos);
+                val = get_next_value(&cur_pos);
+                URLDigest.URL = val;
+
+                // digest
+                key = get_next_key(&cur_pos);
+                val = get_next_value(&cur_pos);
+                URLDigest.digest = val;
+
+                URLDigest.next = NULL;
+                payloadInfo.URLDigest = &URLDigest;
+                manifest.payloadInfo = &payloadInfo;
                 break;
             case 6:
                 // PRECURSORS
+                val = get_next_value(&cur_pos);
+                precursorImage.URL = NULL;
+                precursorImage.digest = NULL;
+                precursorImage.next = NULL;
+                manifest.precursorImage = &precursorImage;
                 break;
             case 7:
                 // DEPENDENCIES
+                val = get_next_value(&cur_pos);
+                dependencies.URL = NULL;
+                dependencies.digest = NULL;
+                dependencies.next = NULL;
+                manifest.dependencies = &dependencies;
                 break;
             case 8:
                 // OPTIONS
+                val = get_next_value(&cur_pos);
+                options.type = -1;
+                options.value = NULL;
+                options.next = NULL;
+                manifest.options = &options;
                 break;
-        }
-        printf("3. Key: %d. Value: %s\n", key, ret);      
+        }     
     
     }
     printf("VERSION: %d\n", manifest.versionID);
@@ -134,24 +133,21 @@ void main() {
     printf("PRECOND 2: %d %s\n", manifest.preConditions->next->type, manifest.preConditions->next->value);
     printf("POSTCOND: %d %s\n", manifest.postConditions->type, manifest.postConditions->value);
     printf("CONTENT KEY METHOD: %d\n", manifest.contentKeyMethod);
+    printf("FORMAT: %d SIZE: %d STORAGE: %d\n", manifest.payloadInfo->format, manifest.payloadInfo->size, manifest.payloadInfo->storage);
+    printf("URL: %s DIGEST: %s\n", manifest.payloadInfo->URLDigest->URL, manifest.payloadInfo->URLDigest->digest);
+    printf("PRECURSORS: %s %s\n", manifest.precursorImage->URL, manifest.precursorImage->digest);
+    printf("DEPENDENCIES: %s %s\n", manifest.dependencies->URL, manifest.dependencies->digest);
+    printf("OPTIONS: %d %s\n", manifest.options->type, manifest.options->value);
 }
 
 int get_next_key(char **buffer) {
-    //char *buffer = *pos;
-    //printf("Starting at %c\n", **buffer);
     char check; // Will hold the candidate for the key value
     while(**buffer != '\0') {
-        //printf("Scanning %c%c%c\n", **buffer, *(*buffer+1), *(*buffer+2));
         check = (*buffer)[1];
-        //printf("Is %c digit? %s len %ld\n", check, is_digit(&check) ? "Yes" : "No", strlen(&check));
-
         // Check for the pattern "X" where X is a digit
         if(**buffer == '"' && is_digit(&check) && *(*buffer + 2) == '"') {
-            //printf("Found %c%c%c\n", **buffer, *(*buffer + 1), *(*buffer + 2));
-            //printf("Buffer: %p\n", (void *)*buffer);
             // Advance the buffer past the current key, to the value (skipping the ':')
-            // TODO: Increment with distance to next space + 1
-            (*buffer) += 4;
+            *buffer += 4;
             return atoi(&check);
         } else {
             (*buffer)++;
@@ -160,7 +156,6 @@ int get_next_key(char **buffer) {
 }
 
 char *get_next_value(char **buffer) {
-    // Distance until end of value (comma separation)
     char *index = strchr(*buffer, ',');
     int distance;
     // Index == NULL means no comma found, string approaching its end
@@ -168,22 +163,23 @@ char *get_next_value(char **buffer) {
     if(index == NULL) {
         index = strchr(*buffer, '}');
     }
+    // Distance until end of value (comma separation)
     distance = index - *buffer;
 
     // TODO: Memory allocation for Contiki
     char *ret = malloc(distance+1);
     // Copy the value field
     strncpy(ret, *buffer, distance);
-    //printf("RET1: %s\n", ret);
+    // Check if there is a citation mark (value is in string format)
     char *mark = strchr(ret, '"');
     if(mark != NULL) {
+        // Move past the first citation mark ...
         ret += mark - ret + 1;
-        //printf("RET2: %s\n", ret);
         mark = strchr(ret, '"');
+        // ... and cut off the second citation mark
         ret[mark - ret] = '\0';
-        //printf("RET3: %s\n", ret);
     } else {
-        // Null terminate
+        // Null terminate the string
         ret[distance] = '\0';
     }
 
@@ -198,7 +194,6 @@ int is_digit(char *c) {
         if(*c < '0' || *c > '9') {
             return 0;
         }
-        
         c++;
     }
     return 1;
