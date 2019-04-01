@@ -34,6 +34,7 @@ void main() {
                 // SEQUENCE NUMBER
                 val = get_next_value(&cur_pos);
                 manifest.sequenceNumber = atoi(val);
+                free(val);
                 break;
             case 2:
                 // PRECONDITIONS
@@ -41,17 +42,21 @@ void main() {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 preConditions.type = atoi(val);
+                free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 preConditions.value = val;
+                free(val);
 
                 // Second pair (class id)
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 nextPreCondition.type = atoi(val);
+                free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 nextPreCondition.value = val;
+                free(val);
 
                 preConditions.next = &nextPreCondition;
                 manifest.preConditions = &preConditions;
@@ -59,6 +64,7 @@ void main() {
             case 3:
                 // POSTCONDITIONS
                 val = get_next_value(&cur_pos);
+                free(val);
                 postConditions.type = -1;
                 postConditions.value = NULL;
                 postConditions.next = NULL;
@@ -68,6 +74,7 @@ void main() {
                 // CONTENT KEY METHOD
                 val = get_next_value(&cur_pos);
                 manifest.contentKeyMethod = atoi(val);
+                free(val);
                 break;
             case 5:
                 // PAYLOAD INFO
@@ -75,16 +82,19 @@ void main() {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 payloadInfo.format = atoi(val);
+                free(val);
 
                 // Size
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 payloadInfo.size = atoi(val);
+                free(val);
 
                 // Storage
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 payloadInfo.storage = atoi(val);
+                free(val);
 
                 // Start of URLDigest, skip its key
                 get_next_key(&cur_pos);
@@ -92,11 +102,13 @@ void main() {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 URLDigest.URL = val;
+                free(val);
 
                 // digest
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 URLDigest.digest = val;
+                free(val);
 
                 URLDigest.next = NULL;
                 payloadInfo.URLDigest = &URLDigest;
@@ -105,6 +117,7 @@ void main() {
             case 6:
                 // PRECURSORS
                 val = get_next_value(&cur_pos);
+                free(val);
                 precursorImage.URL = NULL;
                 precursorImage.digest = NULL;
                 precursorImage.next = NULL;
@@ -113,6 +126,7 @@ void main() {
             case 7:
                 // DEPENDENCIES
                 val = get_next_value(&cur_pos);
+                free(val);
                 dependencies.URL = NULL;
                 dependencies.digest = NULL;
                 dependencies.next = NULL;
@@ -121,6 +135,7 @@ void main() {
             case 8:
                 // OPTIONS
                 val = get_next_value(&cur_pos);
+                free(val);
                 options.type = -1;
                 options.value = NULL;
                 options.next = NULL;
