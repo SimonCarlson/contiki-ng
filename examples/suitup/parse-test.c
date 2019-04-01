@@ -5,7 +5,7 @@
 char *manifest_buffer = "{\"0\":0, \"1\": 123456, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": []}"; //, \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [{}], \"7\": [{}], \"8\": [{}]}";
 
 int get_next_key(char**);
-void get_next_value(char**, char*);
+char *get_next_value(char**);
 int is_digit(char*);
 
 typedef struct manifest_s {
@@ -58,97 +58,46 @@ void main() {
 
     char *cur_pos = manifest_buffer;
     int key;
-    char ret[256];
+    char *ret;
     while(*cur_pos != '\0' && strlen(cur_pos) != 0) {
-        key = get_next_key(&cur_pos);        
-
+        //printf("%s\n", cur_pos);
+        key = get_next_key(&cur_pos);
         switch(key) {
             case 0:
-                // versionID
-                get_next_value(&cur_pos, ret);
-                int version_val = atoi(ret);
-                manifest.versionID = version_val;
+                // VERSION ID
+                ret = get_next_value(&cur_pos);
+                manifest.versionID = atoi(ret);
                 break;
             case 1:
-                // sequenceNumber
-                get_next_value(&cur_pos, ret);
-                char *seq_val = ret + 1;
-                // TODO: Sequence number is no longer encoded as a string, fix formatting
-                *(seq_val + strlen(seq_val) - 1) = '\0';
-                manifest.sequenceNumber = atoi(seq_val);
+                // SEQUENCE NUMBER
+                ret = get_next_value(&cur_pos);
+                manifest.sequenceNumber = atoi(ret);
                 break;
             case 2:
-                // preConditions
-                printf("Current buffer: %p %s\n", cur_pos, cur_pos);
-                condition_t *current;
-                //char temp_val[50];
-                while(strstr(cur_pos, "}]") - cur_pos > 0) {
-                    key = get_next_key(&cur_pos);
-                    get_next_value(&cur_pos, ret);
-                    current->type = atoi(ret);
+                key = get_next_key(&cur_pos);
+                ret = get_next_value(&cur_pos);
+                printf("1. Key: %d. Value: %s\n", key, ret);
+                key = get_next_key(&cur_pos);
+                ret = get_next_value(&cur_pos);
+                printf("2. Key: %d. Value: %s\n", key, ret);
 
-                    key = get_next_key(&cur_pos);
-                    get_next_value(&cur_pos, ret);
-                    memcpy(current->value, ret, strlen(ret));
-
-                    current->next = malloc(sizeof(condition_t));
-
-                    if(preConditions.type == -1) {
-                        preConditions = *current;
-                    }
-
-                    if(strstr(cur_pos, "}]") - cur_pos > 0) {
-                        current = current->next;
-                    } else {
-                        current->next = NULL;
-                    }
-                }
-                printf("preCond value: %s\n", preConditions.value);
-                manifest.preConditions = &preConditions;
+                key = get_next_key(&cur_pos);
+                ret = get_next_value(&cur_pos);
+                printf("1. Key: %d. Value: %s\n", key, ret);
+                key = get_next_key(&cur_pos);
+                ret = get_next_value(&cur_pos);
+                printf("2. Key: %d. Value: %s\n", key, ret);
                 break;
             case 3:
-                // postConditions
-                get_next_value(&cur_pos, ret);
-                postConditions.type = -1;
-                postConditions.value[0] = '\0';
-                postConditions.next = NULL;
-                manifest.postConditions = &postConditions;
+                ret = get_next_value(&cur_pos);
                 break;
-            case 4:
-                // contentKeyMethod
-                get_next_value(&cur_pos, ret);
-                break;
-            case 5:
-                // payloadInfo
-                break;
-            case 6:
-                // precursorImage
-                get_next_value(&cur_pos, ret);
-                precursorImage->URL = NULL;
-                precursorImage->digest = NULL;
-                precursorImage->next = NULL;
-                manifest.precursorImage = precursorImage;
-                break;
-            case 7:
-                // dependencies
-                get_next_value(&cur_pos, ret);
-                dependencies->URL = NULL;
-                dependencies->digest = NULL;
-                dependencies->next = NULL;
-                manifest.dependencies = dependencies;
-                break;
-            case 8:
-                // options
-                get_next_value(&cur_pos, ret);
-                options->type = -1;
-                options->value = NULL;
-                options->next = NULL;
-                manifest.options = options;
+            default:
                 break;
         }
-
-    //printf("VERSION: %d\n", manifest.versionID);
-    //printf("SEQUENCE: %d\n", manifest.sequenceNumber);
+        printf("3. Key: %d. Value: %s\n", key, ret);      
+    
+    printf("VERSION: %d\n", manifest.versionID);
+    printf("SEQUENCE: %d\n", manifest.sequenceNumber);
     }
 }
 
@@ -175,7 +124,7 @@ int get_next_key(char **buffer) {
     }
 }
 
-void get_next_value(char **buffer, char *ret) {
+char *get_next_value(char **buffer) {
     // Distance until end of value (comma separation)
     char *index = strchr(*buffer, ',');
     int distance;
@@ -186,20 +135,35 @@ void get_next_value(char **buffer, char *ret) {
     }
     distance = index - *buffer;
 
+    // TODO: Memory allocation for Contiki
+    char *ret = malloc(distance+1);
     // Copy the value field
     strncpy(ret, *buffer, distance);
+    //printf("RET1: %s\n", ret);
+    char *mark = strchr(ret, '"');
+    if(mark != NULL) {
+        ret += mark - ret + 1;
+        //printf("RET2: %s\n", ret);
+        mark = strchr(ret, '"');
+        ret[mark - ret] = '\0';
+        //printf("RET3: %s\n", ret);
+    } else {
+        // Null terminate
+        ret[distance] = '\0';
+    }
+
     // Advance buffer past the extracted value
     *buffer = *buffer + distance + 1;
-    // Null terminate
-    ret[distance] = '\0';
+    return ret;
 }
 
 
 int is_digit(char *c) {
-    while(*c != '\0')
-    {
-        if(*c < '0' || *c > '9')
+    while(*c != '\0') {
+        if(*c < '0' || *c > '9') {
             return 0;
+        }
+        
         c++;
     }
     return 1;
