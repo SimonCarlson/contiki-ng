@@ -22,7 +22,7 @@ typedef struct manifest_s {
 
 typedef struct condition_s {
     int type;
-    char value[50];
+    char *value;
     struct condition_s *next;
 } condition_t;
 
@@ -48,6 +48,7 @@ typedef struct option_s {
 void main() {
     manifest_t manifest;
     condition_t preConditions;
+    condition_t nextPreCondition;
     preConditions.type = -1;
     condition_t postConditions;
     payloadInfo_t payloadInfo;
@@ -74,31 +75,65 @@ void main() {
                 manifest.sequenceNumber = atoi(ret);
                 break;
             case 2:
+                // PRECONDITIONS
+                // First pair
                 key = get_next_key(&cur_pos);
                 ret = get_next_value(&cur_pos);
+                preConditions.type = atoi(ret);
                 printf("1. Key: %d. Value: %s\n", key, ret);
                 key = get_next_key(&cur_pos);
                 ret = get_next_value(&cur_pos);
+                preConditions.value = ret;
                 printf("2. Key: %d. Value: %s\n", key, ret);
 
+                // Second pair
                 key = get_next_key(&cur_pos);
                 ret = get_next_value(&cur_pos);
+                nextPreCondition.type = atoi(ret);
                 printf("1. Key: %d. Value: %s\n", key, ret);
                 key = get_next_key(&cur_pos);
                 ret = get_next_value(&cur_pos);
+                nextPreCondition.value = ret;
                 printf("2. Key: %d. Value: %s\n", key, ret);
+
+                preConditions.next = &nextPreCondition;
+                manifest.preConditions = &preConditions;
                 break;
             case 3:
+                // POSTCONDITIONS
                 ret = get_next_value(&cur_pos);
+                postConditions.type = -1;
+                postConditions.value = NULL;
+                postConditions.next = NULL;
+                manifest.postConditions = &postConditions;
                 break;
-            default:
+            case 4:
+                // CONTENT KEY METHOD
+                ret = get_next_value(&cur_pos);
+                manifest.contentKeyMethod = atoi(ret);
+                break;
+            case 5:
+                // PAYLOAD INFO
+                break;
+            case 6:
+                // PRECURSORS
+                break;
+            case 7:
+                // DEPENDENCIES
+                break;
+            case 8:
+                // OPTIONS
                 break;
         }
         printf("3. Key: %d. Value: %s\n", key, ret);      
     
+    }
     printf("VERSION: %d\n", manifest.versionID);
     printf("SEQUENCE: %d\n", manifest.sequenceNumber);
-    }
+    printf("PRECOND 1: %d %s\n", manifest.preConditions->type, manifest.preConditions->value);
+    printf("PRECOND 2: %d %s\n", manifest.preConditions->next->type, manifest.preConditions->next->value);
+    printf("POSTCOND: %d %s\n", manifest.postConditions->type, manifest.postConditions->value);
+    printf("CONTENT KEY METHOD: %d\n", manifest.contentKeyMethod);
 }
 
 int get_next_key(char **buffer) {
