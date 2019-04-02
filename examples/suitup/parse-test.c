@@ -25,7 +25,7 @@ void main() {
     manifest->dependencies = &dependencies;
     manifest->options = &options;
 
-    manifest_parser(&manifest);
+    manifest_parser(&manifest, manifest_buffer);
     print_manifest(manifest);
 }
 
@@ -43,8 +43,8 @@ void print_manifest(manifest_t *manifest) {
     printf("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
 }
 
-void manifest_parser(manifest_t **manifest_p) {
-    char *cur_pos = manifest_buffer;
+void manifest_parser(manifest_t **manifest_p, char *manifest_string) {
+    char *cur_pos = manifest_string;
     int key;
     char *val;
     // Traverse the manifest

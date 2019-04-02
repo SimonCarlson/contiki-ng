@@ -35,7 +35,7 @@ typedef struct option_s {
     struct option_s *next;
 } option_t;
 
-void manifest_parser(manifest_t**);
+void manifest_parser(manifest_t**, char*);
 int get_next_key(char**);
 char *get_next_value(char**);
 int is_digit(char*);
