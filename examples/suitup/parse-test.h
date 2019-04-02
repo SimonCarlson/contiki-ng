@@ -1,7 +1,3 @@
-int get_next_key(char**);
-char *get_next_value(char**);
-int is_digit(char*);
-
 typedef struct manifest_s {
     int versionID;
     int sequenceNumber;
@@ -38,3 +34,9 @@ typedef struct option_s {
     char *value;
     struct option_s *next;
 } option_t;
+
+void manifest_parser(manifest_t**);
+int get_next_key(char**);
+char *get_next_value(char**);
+int is_digit(char*);
+void print_manifest(manifest_t*);
