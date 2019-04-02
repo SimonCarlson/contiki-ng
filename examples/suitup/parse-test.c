@@ -3,31 +3,7 @@
 #include <stdlib.h>
 #include "parse-test.h"
 
-char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
-
-void main() {
-    manifest_t *manifest;
-    condition_t preConditions;
-    condition_t nextPreCondition;
-    condition_t postConditions;
-    payloadInfo_t payloadInfo;
-    URLDigest_t URLDigest;
-    URLDigest_t precursorImage;
-    URLDigest_t dependencies;
-    option_t options;
-
-    preConditions.next = &nextPreCondition;
-    manifest->preConditions = &preConditions;
-    manifest->postConditions = &postConditions;
-    payloadInfo.URLDigest = &URLDigest;
-    manifest->payloadInfo = &payloadInfo;
-    manifest->precursorImage = &precursorImage;
-    manifest->dependencies = &dependencies;
-    manifest->options = &options;
-
-    manifest_parser(&manifest, manifest_buffer);
-    print_manifest(manifest);
-}
+//char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 
 void print_manifest(manifest_t *manifest) {
     printf("VERSION: %d\n", manifest->versionID);
@@ -43,7 +19,31 @@ void print_manifest(manifest_t *manifest) {
     printf("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
 }
 
-void manifest_parser(manifest_t **manifest_p, char *manifest_string) {
+/*void main() {
+    manifest_t manifest;
+    condition_t preConditions;
+    condition_t nextPreCondition;
+    condition_t postConditions;
+    payloadInfo_t payloadInfo;
+    URLDigest_t URLDigest;
+    URLDigest_t precursorImage;
+    URLDigest_t dependencies;
+    option_t options;
+
+    preConditions.next = &nextPreCondition;
+    manifest.preConditions = &preConditions;
+    manifest.postConditions = &postConditions;
+    payloadInfo.URLDigest = &URLDigest;
+    manifest.payloadInfo = &payloadInfo;
+    manifest.precursorImage = &precursorImage;
+    manifest.dependencies = &dependencies;
+    manifest.options = &options;
+
+    manifest_parser(&manifest, manifest_buffer);
+    print_manifest(&manifest);
+}*/
+
+void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
     char *cur_pos = manifest_string;
     int key;
     char *val;
@@ -53,16 +53,14 @@ void manifest_parser(manifest_t **manifest_p, char *manifest_string) {
         switch(key) {
             case 0:
                 // VERSION ID
-                printf("Version ID!\n");
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->versionID = atoi(val);
+                manifest_p->versionID = atoi(val);
                 free(val);
                 break;
             case 1:
                 // SEQUENCE NUMBER
-                printf("Sequence number!\n");
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->sequenceNumber = atoi(val);
+                manifest_p->sequenceNumber = atoi(val);
                 free(val);
                 break;
             case 2:
@@ -70,39 +68,39 @@ void manifest_parser(manifest_t **manifest_p, char *manifest_string) {
                 // First pair (vendor id)
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->preConditions->type = atoi(val);
+                manifest_p->preConditions->type = atoi(val);
                 free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->preConditions->value = val;
+                manifest_p->preConditions->value = val;
                 //free(val);
 
                 // Second pair (class id)
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->preConditions->next->type = atoi(val);
+                manifest_p->preConditions->next->type = atoi(val);
                 free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->preConditions->next->value = val;
+                manifest_p->preConditions->next->value = val;
                 //free(val);
 
                 //preConditions.next = &nextPreCondition;
-                //(*manifest_p)->preConditions = &preConditions;
+                //manifest_p->preConditions = &preConditions;
                 break;
             case 3:
                 // POSTCONDITIONS
                 val = get_next_value(&cur_pos);
                 free(val);
-                (*manifest_p)->postConditions->type = -1;
-                (*manifest_p)->postConditions->value = NULL;
-                (*manifest_p)->postConditions->next = NULL;
-                //(*manifest_p)->postConditions = &postConditions;
+                manifest_p->postConditions->type = -1;
+                manifest_p->postConditions->value = NULL;
+                manifest_p->postConditions->next = NULL;
+                //manifest_p->postConditions = &postConditions;
                 break;
             case 4:
                 // CONTENT KEY METHOD
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->contentKeyMethod = atoi(val);
+                manifest_p->contentKeyMethod = atoi(val);
                 free(val);
                 break;
             case 5:
@@ -110,19 +108,19 @@ void manifest_parser(manifest_t **manifest_p, char *manifest_string) {
                 // Format
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->payloadInfo->format = atoi(val);
+                manifest_p->payloadInfo->format = atoi(val);
                 free(val);
 
                 // Size
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->payloadInfo->size = atoi(val);
+                manifest_p->payloadInfo->size = atoi(val);
                 free(val);
 
                 // Storage
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->payloadInfo->storage = atoi(val);
+                manifest_p->payloadInfo->storage = atoi(val);
                 free(val);
 
                 // Start of URLDigest, skip its key
@@ -130,50 +128,51 @@ void manifest_parser(manifest_t **manifest_p, char *manifest_string) {
                 // URL
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->payloadInfo->URLDigest->URL = val;
+                manifest_p->payloadInfo->URLDigest->URL = val;
                 //free(val);
 
                 // digest
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                (*manifest_p)->payloadInfo->URLDigest->digest = val;
+                manifest_p->payloadInfo->URLDigest->digest = val;
                 //free(val);
 
-                (*manifest_p)->payloadInfo->URLDigest->next = NULL;
+                manifest_p->payloadInfo->URLDigest->next = NULL;
                 //payloadInfo.URLDigest = &URLDigest;
-                //(*manifest_p)->payloadInfo = &payloadInfo;
+                //manifest_p->payloadInfo = &payloadInfo;
                 break;
             case 6:
                 // PRECURSORS
                 val = get_next_value(&cur_pos);
                 free(val);
-                (*manifest_p)->precursorImage->URL = NULL;
-                (*manifest_p)->precursorImage->digest = NULL;
-                (*manifest_p)->precursorImage->next = NULL;
-                //(*manifest_p)->precursorImage = &precursorImage;
+                manifest_p->precursorImage->URL = NULL;
+                manifest_p->precursorImage->digest = NULL;
+                manifest_p->precursorImage->next = NULL;
+                //manifest_p->precursorImage = &precursorImage;
                 break;
             case 7:
                 // DEPENDENCIES
                 val = get_next_value(&cur_pos);
                 free(val);
-                (*manifest_p)->dependencies->URL = NULL;
-                (*manifest_p)->dependencies->digest = NULL;
-                (*manifest_p)->dependencies->next = NULL;
-                //(*manifest_p)->dependencies = &dependencies;
+                manifest_p->dependencies->URL = NULL;
+                manifest_p->dependencies->digest = NULL;
+                manifest_p->dependencies->next = NULL;
+                //manifest_p->dependencies = &dependencies;
                 break;
             case 8:
                 // OPTIONS
                 val = get_next_value(&cur_pos);
                 free(val);
-                (*manifest_p)->options->type = -1;
-                (*manifest_p)->options->value = NULL;
-                (*manifest_p)->options->next = NULL;
-                //(*manifest_p)->options = &options;
+                manifest_p->options->type = -1;
+                manifest_p->options->value = NULL;
+                manifest_p->options->next = NULL;
+                //manifest_p->options = &options;
                 break;
         }     
     
     }
 }
+
 
 int get_next_key(char **buffer) {
     char check; // Will hold the candidate for the key value
