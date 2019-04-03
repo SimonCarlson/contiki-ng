@@ -71,6 +71,13 @@
 char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
 char digest[256];
+struct value_t {
+    char value[256];        // Digest is SHA-256, needs to fit
+};
+
+// TODO: Why does it not work with blocks = 1 and freeing the memory?
+#define BLOCKS 20
+MEMB(manifestValue, struct value_t, BLOCKS);
 
 PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
@@ -222,13 +229,15 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 // VERSION ID
                 val = get_next_value(&cur_pos);
                 manifest_p->versionID = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
                 break;
             case 1:
                 // SEQUENCE NUMBER
                 val = get_next_value(&cur_pos);
                 manifest_p->sequenceNumber = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
                 break;
             case 2:
                 // PRECONDITIONS
@@ -236,21 +245,25 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->type = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->value = val;
-                //free(val);
+                memb_free(&manifestValue, val);
+                ////free(val);
 
                 // Second pair (class id)
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->next->type = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->next->value = val;
-                //free(val);
+                memb_free(&manifestValue, val);
+                ////free(val);
 
                 //preConditions.next = &nextPreCondition;
                 //manifest_p->preConditions = &preConditions;
@@ -258,17 +271,19 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
             case 3:
                 // POSTCONDITIONS
                 val = get_next_value(&cur_pos);
-                free(val);
+                //free(val);
                 manifest_p->postConditions->type = -1;
                 manifest_p->postConditions->value = NULL;
                 manifest_p->postConditions->next = NULL;
+                memb_free(&manifestValue, val);
                 //manifest_p->postConditions = &postConditions;
                 break;
             case 4:
                 // CONTENT KEY METHOD
                 val = get_next_value(&cur_pos);
                 manifest_p->contentKeyMethod = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
                 break;
             case 5:
                 // PAYLOAD INFO
@@ -276,19 +291,22 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->format = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
 
                 // Size
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->size = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
 
                 // Storage
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->storage = atoi(val);
-                free(val);
+                memb_free(&manifestValue, val);
+                //free(val);
 
                 // Start of URLDigest, skip its key
                 get_next_key(&cur_pos);
@@ -296,13 +314,15 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->URLDigest->URL = val;
-                //free(val);
+                memb_free(&manifestValue, val);
+                ////free(val);
 
                 // digest
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->URLDigest->digest = val;
-                //free(val);
+                memb_free(&manifestValue, val);
+                ////free(val);
 
                 manifest_p->payloadInfo->URLDigest->next = NULL;
                 //payloadInfo.URLDigest = &URLDigest;
@@ -311,28 +331,31 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
             case 6:
                 // PRECURSORS
                 val = get_next_value(&cur_pos);
-                free(val);
+                //free(val);
                 manifest_p->precursorImage->URL = NULL;
                 manifest_p->precursorImage->digest = NULL;
                 manifest_p->precursorImage->next = NULL;
+                memb_free(&manifestValue, val);
                 //manifest_p->precursorImage = &precursorImage;
                 break;
             case 7:
                 // DEPENDENCIES
                 val = get_next_value(&cur_pos);
-                free(val);
+                //free(val);
                 manifest_p->dependencies->URL = NULL;
                 manifest_p->dependencies->digest = NULL;
                 manifest_p->dependencies->next = NULL;
+                memb_free(&manifestValue, val);
                 //manifest_p->dependencies = &dependencies;
                 break;
             case 8:
                 // OPTIONS
                 val = get_next_value(&cur_pos);
-                free(val);
+                //free(val);
                 manifest_p->options->type = -1;
                 manifest_p->options->value = NULL;
                 manifest_p->options->next = NULL;
+                memb_free(&manifestValue, val);
                 //manifest_p->options = &options;
                 break;
         }     
@@ -369,7 +392,9 @@ char *get_next_value(char **buffer) {
     distance = index - *buffer;
 
     // TODO: Memory allocation for Contiki
-    char *ret = malloc(distance+1);
+    //char *ret = malloc(distance+1);
+    struct value_t *val = (struct value_t*)memb_alloc(&manifestValue);
+    char *ret = val->value;
     // Copy the value field
     strncpy(ret, *buffer, distance);
     // Check if there is a citation mark (value is in string format)
