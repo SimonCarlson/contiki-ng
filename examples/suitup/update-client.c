@@ -55,7 +55,7 @@
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
-#define SERVER_EP "coaps://[fe80::201:1:1:1]"
+#define SERVER_EP "coap://[fe80::201:1:1:1]"
 //#define SERVER_EP "coap://[fd00::302:304:506:708]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
@@ -63,14 +63,10 @@
 #define INTERVAL 1
 #define TIMEOUT 1
 
-// TODO: Optimize, size of IDs known
-//static char query_data[128]; /* allocate some data for queries and updates */
-//static coap_request_state_t rd_request_state;
 // TODO: Assumption, fix dynamically?
-//static char manifest_buffer[451];
-char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
+static char manifest_buffer[512];
+//char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
-char digest[256];
 struct value_t {
     char value[256];        // Digest is SHA-256, needs to fit
 };
@@ -124,7 +120,6 @@ image_callback(coap_message_t *response)
 int manifest_checker(manifest_t *manifest) {
   printf("VENDOR ID: %d\n", strcmp(manifest->preConditions->value, VENDOR_ID));
   printf("CLASS ID: %d\n", strcmp(manifest->preConditions->next->value, CLASS_ID));
-  strcpy(digest, manifest->payloadInfo->URLDigest->digest);
   return 1;
 }
 
@@ -136,16 +131,15 @@ PROCESS_THREAD(update_client, ev, data)
   PROCESS_BEGIN();
   static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
-  //coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
-  //coap_endpoint_print(&server_ep);
-  /* receives all CoAP messages */
+  coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+  coap_endpoint_print(&server_ep);
   coap_engine_init();
   coap_keystore_simple_init();
 
   etimer_set(&et, CLOCK_SECOND * INTERVAL);
-  //PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
-    /*printf("Send packet to update/register\n");
+    printf("Send packet to update/register\n");
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
     printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
     coap_endpoint_connect(&server_ep);
@@ -156,6 +150,8 @@ PROCESS_THREAD(update_client, ev, data)
     //snprintf(query_data, sizeof(query_data) - 1, "%s&%s&%s", VENDOR_ID, CLASS_ID, VERSION);
     //coap_set_payload(request, (uint8_t *)query_data, sizeof(query_data) - 1);
 
+    // TODO: Optimize, size of IDs known
+    char query_data[90]; /* allocate some data for queries and updates */
     // Copy POST data into buffer
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     int bytes = coap_set_header_uri_query(request, query_data); 
@@ -168,7 +164,7 @@ PROCESS_THREAD(update_client, ev, data)
 
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
-    COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);*/
+    COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
     manifest_t m;
     condition_t pre;
     pre.type = 1;
@@ -199,7 +195,6 @@ PROCESS_THREAD(update_client, ev, data)
     manifest_parser(&manifest, manifest_buffer);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
-    accept = 0;
     printf("Manifest done\n");
 
     if(accept) {
@@ -207,8 +202,6 @@ PROCESS_THREAD(update_client, ev, data)
       coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
       COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
       printf("Image done\n");
-      printf("MANIFEST: %s\n", manifest_buffer);
-      printf("MANIFEST LENGTH: %ld\n", strlen(manifest_buffer));
       printf("\n--Done--\n");
     } else {
       printf("Mismatched manifest.\n");
