@@ -72,7 +72,7 @@ struct value_t {
 };
 
 // TODO: Why does it not work with blocks = 1 and freeing the memory?
-#define BLOCKS 20
+#define BLOCKS 6
 MEMB(manifestValue, struct value_t, BLOCKS);
 
 PROCESS(update_client, "Update client");
@@ -118,8 +118,16 @@ image_callback(coap_message_t *response)
 
 
 int manifest_checker(manifest_t *manifest) {
-  printf("VENDOR ID: %d\n", strcmp(manifest->preConditions->value, VENDOR_ID));
-  printf("CLASS ID: %d\n", strcmp(manifest->preConditions->next->value, CLASS_ID));
+  if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
+      printf("Mismatched vendor ID.\n");
+      return 0;
+  }
+
+  if(strcmp(manifest->preConditions->next->value, CLASS_ID) != 0) {
+      printf("Mismatched class ID.\n");
+      return 0;
+  }
+
   return 1;
 }
 
@@ -146,10 +154,6 @@ PROCESS_THREAD(update_client, ev, data)
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
 
-    // const char msg[] = "Toggle!";
-    //snprintf(query_data, sizeof(query_data) - 1, "%s&%s&%s", VENDOR_ID, CLASS_ID, VERSION);
-    //coap_set_payload(request, (uint8_t *)query_data, sizeof(query_data) - 1);
-
     // TODO: Optimize, size of IDs known
     char query_data[90]; /* allocate some data for queries and updates */
     // Copy POST data into buffer
@@ -165,22 +169,11 @@ PROCESS_THREAD(update_client, ev, data)
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
-    manifest_t m;
-    condition_t pre;
-    pre.type = 1;
-    pre.value = "0";
-    pre.next = NULL;
-    m.preConditions = &pre;
-    printf("%d\n", m.preConditions->type);
 
     manifest_t manifest;
-    condition_t preConditions;
-    condition_t nextPreCondition;
-    condition_t postConditions;
+    condition_t preConditions, nextPreCondition, postConditions;
     payloadInfo_t payloadInfo;
-    URLDigest_t URLDigest;
-    URLDigest_t precursorImage;
-    URLDigest_t dependencies;
+    URLDigest_t URLDigest, precursorImage, dependencies;
     option_t options;
 
     preConditions.next = &nextPreCondition;
@@ -191,6 +184,7 @@ PROCESS_THREAD(update_client, ev, data)
     manifest.precursorImage = &precursorImage;
     manifest.dependencies = &dependencies;
     manifest.options = &options;
+    
     printf("Starting parser\n");
     manifest_parser(&manifest, manifest_buffer);
     print_manifest(&manifest);
@@ -421,6 +415,8 @@ int is_digit(char *c) {
 
 
 void print_manifest(manifest_t *manifest) {
+    printf("MANIFEST: %s\n", manifest_buffer);
+    printf("MANIFEST LENGTH: %ld\n", strlen(manifest_buffer));
     printf("VERSION: %d\n", manifest->versionID);
     printf("SEQUENCE: %d\n", manifest->sequenceNumber);
     printf("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
