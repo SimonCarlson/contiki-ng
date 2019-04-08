@@ -25,24 +25,56 @@ RESOURCE(res_image,
          NULL,
          NULL);
 
+#define CHUNKS_TOTAL 600000
+
+char *image = "This is a payload message! This is a payload message! This is a payload message! This is a payload message! This is a payload message!";
+
 static void
 res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("IMAGE RESOURCE\n");
-  const char *vendor_id = NULL;
-  //const char *class_id = NULL;
-  //const char *version = NULL;
-  /* Some data that has the length up to REST_MAX_CHUNK_SIZE. For more, see the chunk resource. */
-  char const *const message = "Hello World! ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy";
-  int length = 12; /*           |<-------->| */
-
-  if(coap_get_query_variable(request, "vid", &vendor_id)) {
-    printf("Vendor id: %s", vendor_id);
-    //memcpy(buffer, vendor_id, length);
+  int32_t strpos = 0;
+  printf("OFFSET: %d\n", *offset);
+  if(*offset >= CHUNKS_TOTAL) {
+    printf("Bad option\n");
+    coap_set_status_code(response, BAD_OPTION_4_02);
+    const char *error_msg = "BlockOutOfScope";
+    coap_set_payload(response, error_msg, strlen(error_msg));
+    return;
   }
 
-  memcpy(buffer, message, length);
-  coap_set_header_content_format(response, TEXT_PLAIN); /* text/plain is the default, hence this option could be omitted. */
-  coap_set_header_etag(response, (uint8_t *)&length, 1);
-  coap_set_payload(response, buffer, length);
+  FILE *fd = fopen("/home/rzmd/Documents/git-repos/contiki-ng/examples/suitup/client-cert.pem", "rb");
+  int bytes;
+  fseek(fd, *offset, SEEK_CUR);
+  bytes = fread((char*)buffer, 1, preferred_size, fd);
+  
+  static int end = 0;
+  /*if(*offset > strlen(image)) {
+    strncpy((char *)buffer, image + *offset, *offset - strlen(image));  
+    end = 1;
+  } else {
+    strncpy((char *)buffer, image + *offset, preferred_size);
+  }*/
+  
+  strpos += bytes;
+  
+  if(strpos > preferred_size) {
+    strpos = preferred_size;
+  }
+  
+  if(*offset + (int32_t)strpos > CHUNKS_TOTAL) {
+    strpos = CHUNKS_TOTAL - *offset;
+  }
+
+  coap_set_payload(response, buffer, strpos);
+  // Update offset for next pass
+  *offset += strpos;
+  //printf("FEOF: %d\n", feof(fd));
+  // End block transmission if exceeding some limit or EOF found in image file
+  if(*offset >= CHUNKS_TOTAL || end == 1){// || feof(fd)) {
+    // End of block transfer
+    printf("END: %d\n", *offset >= CHUNKS_TOTAL);
+    *offset = -1;
+    end = 0;
+  }
 }

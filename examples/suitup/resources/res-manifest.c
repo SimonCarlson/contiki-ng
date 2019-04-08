@@ -16,7 +16,7 @@ static void res_manifest_handler(coap_message_t *request, coap_message_t *respon
  * A handler function named [resource name]_handler must be implemented for each RESOURCE.
  * A buffer for the response payload is provided through the buffer pointer. Simple resources can ignore
  * preferred_size and offset, but must respect the REST_MAX_CHUNK_SIZE limit for the buffer.
- * If a smaller block size is requested for CoAP, the REST framework automatically splits the data.
+ * If a smaller block size is requested for CoAP, the REST framework automatically Fsplits the data.
  */
 RESOURCE(res_manifest,
          "title=\"Update manifest",
@@ -24,7 +24,7 @@ RESOURCE(res_manifest,
          NULL,
          NULL,
          NULL);
-
+  
 #define CHUNKS_TOTAL 2050 // How to determine? Size of file? 
 char *manifest= "{\"0\": 1, \"1\": \"1553762654\", \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [{}], \"7\": [{}], \"8\": [{}]}";
 
@@ -33,7 +33,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
 {
   PRINTF("MANIFEST RESOURCE\n");
   int32_t strpos = 0;
-  printf("OFFSET: %ld\n", *offset);
+  printf("OFFSET: %d\n", *offset);
   if(*offset >= CHUNKS_TOTAL) {
     coap_set_status_code(response, BAD_OPTION_4_02);
     const char *error_msg = "BlockOutOfScope";
@@ -52,10 +52,10 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   
   static int end = 0;
   if(*offset > strlen(manifest)) {
-    strncpy((char*)buffer, manifest + *offset, *offset - strlen(manifest));  
+    strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
     end = 1;
   } else {
-    strncpy((char*)buffer, manifest + *offset, preferred_size);
+    strncpy((char *)buffer, manifest + *offset, preferred_size);
   }
   
   strpos += preferred_size;
