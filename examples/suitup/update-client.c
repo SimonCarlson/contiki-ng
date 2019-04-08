@@ -66,8 +66,11 @@
 
 // TODO: Assumption, fix dynamically?
 static char manifest_buffer[512];
+static char image_buffer[512];
 //char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
+static int image_offset = 0;
+
 struct value_t {
     char value[256];        // Digest is SHA-256, needs to fit
 };
@@ -106,9 +109,11 @@ void image_callback(coap_message_t *response) {
     printf("IMAGE CALLBACK\n");
     const uint8_t *chunk;
 
-    int len = coap_get_payload(response, &chunk);
-
-    printf("Response: %.*s\n", len, (char *)chunk);
+    coap_get_payload(response, &chunk);
+    int copied_bytes = strlen((char *)chunk);
+    printf("BYTES: %d\n", copied_bytes);
+    strncpy(image_buffer + image_offset, (char *)chunk, copied_bytes);
+    image_offset += copied_bytes;
 }
 
 
@@ -192,7 +197,7 @@ PROCESS_THREAD(update_client, ev, data) {
         coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         printf("Image done\n");
-
+        printf("Image data: %s\n", image_buffer);
         // Check digest
         printf("\n--Done--\n");
     } else {
