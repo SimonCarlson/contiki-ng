@@ -46,6 +46,7 @@
 #include "coap-blocking-api.h"
 #include "coap-keystore-simple.h"
 #include "rpl.h"
+//#include "dev/sha256.h"
 #include "parse-test.h"
 //#include "coap-callback-api.h"
 
@@ -79,73 +80,67 @@ PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
 
-void
-register_callback(coap_message_t *response)
-{
-  printf("REGISTER CALLBACK\n");
-  const uint8_t *chunk;
+void register_callback(coap_message_t *response) {
+    printf("REGISTER CALLBACK\n");
+    const uint8_t *chunk;
 
-  int len = coap_get_payload(response, &chunk);
+    int len = coap_get_payload(response, &chunk);
 
-  printf("Response: %.*s\n", len, (char *)chunk);
+    printf("Response: %.*s\n", len, (char *)chunk);
 }
 
 
-void
-manifest_callback(coap_message_t *response)
-{
-  printf("MANIFEST CALLBACK\n");
-  const uint8_t *chunk;
+void manifest_callback(coap_message_t *response) {
+    printf("MANIFEST CALLBACK\n");
+    const uint8_t *chunk;
 
-  coap_get_payload(response, &chunk);
-  int copied_bytes = strlen((char *)chunk);
-  strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
-  manifest_offset += copied_bytes;
-  printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
+    coap_get_payload(response, &chunk);
+    int copied_bytes = strlen((char *)chunk);
+    strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
+    manifest_offset += copied_bytes;
+    printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
 }
 
 
-void
-image_callback(coap_message_t *response)
-{
-  printf("IMAGE CALLBACK\n");
-  const uint8_t *chunk;
+void image_callback(coap_message_t *response) {
+    printf("IMAGE CALLBACK\n");
+    const uint8_t *chunk;
 
-  int len = coap_get_payload(response, &chunk);
+    int len = coap_get_payload(response, &chunk);
 
-  printf("Response: %.*s\n", len, (char *)chunk);
+    printf("Response: %.*s\n", len, (char *)chunk);
 }
 
 
 int manifest_checker(manifest_t *manifest) {
-  if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
-      printf("Mismatched vendor ID.\n");
-      return 0;
-  }
+    // Implement your own manifest checking
+    if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
+        printf("Mismatched vendor ID.\n");
+        return 0;
+    }
 
-  if(strcmp(manifest->preConditions->next->value, CLASS_ID) != 0) {
-      printf("Mismatched class ID.\n");
-      return 0;
-  }
+    if(strcmp(manifest->preConditions->next->value, CLASS_ID) != 0) {
+        printf("Mismatched class ID.\n");
+        return 0;
+    }
 
-  return 1;
+    return 1;
 }
 
 
-PROCESS_THREAD(update_client, ev, data)
-{
-  static struct etimer et;
-  static coap_endpoint_t server_ep;
-  PROCESS_BEGIN();
-  static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
+PROCESS_THREAD(update_client, ev, data) {
+    static struct etimer et;
+    static coap_endpoint_t server_ep;
+    PROCESS_BEGIN();
+    static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
-  coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
-  coap_endpoint_print(&server_ep);
-  coap_engine_init();
-  coap_keystore_simple_init();
+    coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+    coap_endpoint_print(&server_ep);
+    coap_engine_init();
+    coap_keystore_simple_init();
 
-  etimer_set(&et, CLOCK_SECOND * INTERVAL);
-  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+    etimer_set(&et, CLOCK_SECOND * INTERVAL);
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
     printf("Send packet to update/register\n");
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
@@ -170,6 +165,7 @@ PROCESS_THREAD(update_client, ev, data)
     coap_set_header_uri_path(request, "update/manifest");
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
 
+    // Declare and structure manifest
     manifest_t manifest;
     condition_t preConditions, nextPreCondition, postConditions;
     payloadInfo_t payloadInfo;
@@ -192,13 +188,15 @@ PROCESS_THREAD(update_client, ev, data)
     printf("Manifest done\n");
 
     if(accept) {
-      coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
-      coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
-      COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
-      printf("Image done\n");
-      printf("\n--Done--\n");
+        coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
+        coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
+        printf("Image done\n");
+
+        // Check digest
+        printf("\n--Done--\n");
     } else {
-      printf("Mismatched manifest.\n");
+        printf("Mismatched manifest.\n");
     }
 
   PROCESS_END();
@@ -378,13 +376,11 @@ char *get_next_value(char **buffer) {
     // Distance until end of value (comma separation)
     distance = index - *buffer;
 
-    // TODO: Memory allocation for Contiki
-    //char *ret = malloc(distance+1);
     struct value_t *val = (struct value_t*)memb_alloc(&manifestValue);
     char *ret = val->value;
     // Copy the value field
     strncpy(ret, *buffer, distance);
-    // Check if there is a citation mark (value is in string format)
+    // Check if there is a citation mark (meaning value is in string format)
     char *mark = strchr(ret, '"');
     if(mark != NULL) {
         // Move past the first citation mark ...
