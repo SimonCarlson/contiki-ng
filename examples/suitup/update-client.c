@@ -47,7 +47,8 @@
 #include "coap-keystore-simple.h"
 #include "rpl.h"
 //#include "dev/sha256.h"
-#include "parse-test.h"
+#include "manifest-parser.h"
+#include "opt-cose.h"
 //#include "coap-callback-api.h"
 
 /* Log configuration */

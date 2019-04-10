@@ -13,7 +13,7 @@ MODULES_REL += $(TARGET)
 
 # Include the CoAP implementation
 MODULES += os/net/app-layer/coap
-
+PROJECT_SOURCEFILES += opt-cose.c opt-cbor.c cose-aes-ccm.c
 include $(CONTIKI)/Makefile.include
 
 # border router rules
