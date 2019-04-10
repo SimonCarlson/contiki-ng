@@ -13,7 +13,6 @@ MODULES_REL += $(TARGET)
 
 # Include the CoAP implementation
 MODULES += os/net/app-layer/coap
-PROJECT_SOURCEFILES+=parse-test.c
 
 include $(CONTIKI)/Makefile.include
 
