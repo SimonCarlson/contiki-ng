@@ -44,7 +44,6 @@
 #include "coap-keystore-simple.h"
 #include "rpl.h"
 #include "rpl-dag-root.h"
-#include "opt-cose.h"
 
 #define DEBUG 1
 #if DEBUG

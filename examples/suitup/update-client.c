@@ -102,7 +102,7 @@ void manifest_callback(coap_message_t *response) {
     int copied_bytes = strlen((char *)chunk);
     strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
     manifest_offset += copied_bytes;
-    printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
+    //printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
 }
 
 
@@ -418,7 +418,7 @@ int is_digit(char *c) {
 
 void print_manifest(manifest_t *manifest) {
     printf("MANIFEST: %s\n", manifest_buffer);
-    printf("MANIFEST LENGTH: %ld\n", strlen(manifest_buffer));
+    printf("MANIFEST LENGTH: %d\n", strlen(manifest_buffer));
     printf("VERSION: %d\n", manifest->versionID);
     printf("SEQUENCE: %d\n", manifest->sequenceNumber);
     printf("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
