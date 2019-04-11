@@ -72,6 +72,9 @@ static char image_buffer[512];
 static int manifest_offset = 0;
 static int image_offset = 0;
 
+#define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
+void oscoap_printf_hex(unsigned char*, unsigned int);
+
 struct value_t {
     char value[256];        // Digest is SHA-256, needs to fit
 };
@@ -156,7 +159,7 @@ PROCESS_THREAD(update_client, ev, data) {
     coap_set_header_uri_path(request, "update/register");
 
     // TODO: Optimize, size of IDs known
-    char query_data[90]; /* allocate some data for queries and updates */
+    char query_data[90];
     // Copy POST data into buffer
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     int bytes = coap_set_header_uri_query(request, query_data); 
@@ -171,8 +174,33 @@ PROCESS_THREAD(update_client, ev, data) {
     coap_set_header_uri_path(request, "update/manifest");
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
 
+    // TODO: Decode and decrypt manifest
+    printf("MANIFEST LENGTH: %d\n", strlen(manifest_buffer));
+    printf("CIPHERTEXT MANIFEST: ");
+    PRINTF_HEX((uint8_t *)manifest_buffer, 341);
+
+    opt_cose_encrypt_t decrypt;
+	char *aad2 = "0011bbcc22dd44ee55ff660077";
+	uint8_t decrypt_buffer[333];
+	uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+	uint8_t buffer2 = 0;
+    uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
+
+	OPT_COSE_Init(&decrypt);
+	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
+	OPT_COSE_SetNonce(&decrypt, nonce, 7);
+	OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
+	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 333);
+	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 341);
+	
+	OPT_COSE_Decode(&decrypt, &buffer2, 1);
+	OPT_COSE_Decrypt(&decrypt, key2, 16);
+
+    printf("PLAINTEXT: %s\n", decrypt.plaintext);
+    printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
+
     // Declare and structure manifest
-    manifest_t manifest;
+    /*manifest_t manifest;
     condition_t preConditions, nextPreCondition, postConditions;
     payloadInfo_t payloadInfo;
     URLDigest_t URLDigest, precursorImage, dependencies;
@@ -203,7 +231,7 @@ PROCESS_THREAD(update_client, ev, data) {
         printf("\n--Done--\n");
     } else {
         printf("Mismatched manifest.\n");
-    }
+    }*/
 
   PROCESS_END();
 }

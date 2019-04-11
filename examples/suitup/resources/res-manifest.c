@@ -37,7 +37,12 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
 {
   static int transmit = 0;
   static opt_cose_encrypt_t cose;
-  char data[341];
+  uint8_t data[341];
+  uint8_t cose_buffer = 0;
+  char *aad = "0011bbcc22dd44ee55ff660077";
+  uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
+  uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  static uint8_t ciphertext_buffer[341]; // +8 för tag-len
   PRINTF("MANIFEST RESOURCE\n");
   int32_t strpos = 0;
   printf("OFFSET: %d\n", *offset);
@@ -49,29 +54,23 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   }
 
   if(!transmit) {
-	  uint8_t cose_buffer = 0;
-	  char *aad = "0011bbcc22dd44ee55ff660077";
-	  uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
-	  uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-	  uint8_t ciphertext_buffer[strlen(manifest) +8]; // +8 för tag-len
-
 	  OPT_COSE_Init(&cose);
 	  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
 	  OPT_COSE_SetNonce(&cose, nonce, 7);
 	  OPT_COSE_SetContent(&cose, (uint8_t *)manifest, strlen(manifest));
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, strlen(manifest) + 8);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, 341);
 	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
 	  OPT_COSE_Encrypt(&cose, key, 16);
 	  OPT_COSE_Encode(&cose, &cose_buffer);
-    
+    //memcpy(data, cose.ciphertext, cose.ciphertext_len);
     transmit = 1;
   }
 
   printf("Before strncpy\n");
   //strncpy(data, (char *)cose.ciphertext, 2);
-  memcpy(data, (char *)cose.ciphertext + *offset, preferred_size);
-  printf("DATA: %s\n", data);
-  printf("DATA LEN: %d\n", strlen(data));
+  printf("DATA: \n");
+  //PRINTF_HEX((uint8_t *)data, 341);
+  printf("DATA LEN: %d\n", strlen((char *)data));
 
   // Generate data; copy manifest chunk by chunk into buffer, update strpos with bytes
   // copied
@@ -88,7 +87,6 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
     end = 1;
   } else {
     //strncpy((char *)buffer, manifest + *offset, preferred_size);
-    printf("Copying\n");
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, preferred_size);
   }
   
