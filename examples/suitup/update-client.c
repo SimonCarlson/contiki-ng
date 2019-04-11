@@ -122,7 +122,7 @@ void image_callback(coap_message_t *response) {
 
 
 int manifest_checker(manifest_t *manifest) {
-    // Implement your own manifest checking
+    // Check pre conditions etc
     if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
         printf("Mismatched vendor ID.\n");
         return 0;
@@ -175,10 +175,6 @@ PROCESS_THREAD(update_client, ev, data) {
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
 
     // TODO: Decode and decrypt manifest
-    printf("MANIFEST LENGTH: %d\n", strlen(manifest_buffer));
-    printf("CIPHERTEXT MANIFEST: ");
-    PRINTF_HEX((uint8_t *)manifest_buffer, 341);
-
     opt_cose_encrypt_t decrypt;
 	char *aad2 = "0011bbcc22dd44ee55ff660077";
 	uint8_t decrypt_buffer[333];
@@ -196,11 +192,15 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
 
+    strcpy(manifest_buffer, (char *)decrypt.plaintext);
+
     printf("PLAINTEXT: %s\n", decrypt.plaintext);
     printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
+    printf("MANIFEST BUFFER: %s\n", manifest_buffer);
+    printf("POINTERS: %p %p\n", decrypt.plaintext, manifest_buffer);
 
     // Declare and structure manifest
-    /*manifest_t manifest;
+    manifest_t manifest;
     condition_t preConditions, nextPreCondition, postConditions;
     payloadInfo_t payloadInfo;
     URLDigest_t URLDigest, precursorImage, dependencies;
@@ -217,26 +217,31 @@ PROCESS_THREAD(update_client, ev, data) {
     
     printf("Starting parser\n");
     manifest_parser(&manifest, manifest_buffer);
+    printf("Manifest version: %d\n", manifest.versionID);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
     printf("Manifest done\n");
 
     if(accept) {
-        coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
-        coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        printf("Accept!\n");
+        /*coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
+        char URL[50];
+        strcpy(manifest.payloadInfo->URLDigest->URL, URL);
+        coap_set_header_uri_path(request, URL);
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         printf("Image done\n");
         printf("Image data: %s\n", image_buffer);
-        // Check digest
+        // Check digest*/
         printf("\n--Done--\n");
     } else {
         printf("Mismatched manifest.\n");
-    }*/
+    }
 
   PROCESS_END();
 }
 
 void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
+    printf("Parsing at %p: %s\n", manifest_string, manifest_string);
     char *cur_pos = manifest_string;
     int key;
     char *val;
