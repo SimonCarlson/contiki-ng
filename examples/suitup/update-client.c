@@ -105,7 +105,6 @@ void manifest_callback(coap_message_t *response) {
     int copied_bytes = strlen((char *)chunk);
     strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
     manifest_offset += copied_bytes;
-    //printf("Response: %s length: %ld\n", (char *)chunk, strlen((char *)chunk));
 }
 
 
@@ -142,39 +141,38 @@ PROCESS_THREAD(update_client, ev, data) {
     static struct etimer et;
     static coap_endpoint_t server_ep;
     static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
+    // TODO: Optimize, size of IDs known
+    char query_data[90];
 
-    coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
-    coap_endpoint_print(&server_ep);
     coap_engine_init();
     coap_keystore_simple_init();
 
+    coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
+    LOG_INFO_COAP_EP(&server_ep);
+    LOG_INFO_("\n");
+
+    // Connect to server endpoint
+    coap_endpoint_connect(&server_ep);
     etimer_set(&et, CLOCK_SECOND * INTERVAL);
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-
-    printf("Send packet to update/register\n");
-    coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
     printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
-    coap_endpoint_connect(&server_ep);
+    
+    // Register to server
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
-
-    // TODO: Optimize, size of IDs known
-    char query_data[90];
     // Copy POST data into buffer
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     int bytes = coap_set_header_uri_query(request, query_data); 
     printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
-    LOG_INFO_COAP_EP(&server_ep);
-    LOG_INFO_("\n");
-
     COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
     printf("Registration done\n");
 
+    // Get manifest from server
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
 
-    // TODO: Decode and decrypt manifest
+    // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
 	char *aad2 = "0011bbcc22dd44ee55ff660077";
 	uint8_t decrypt_buffer[333];
@@ -188,18 +186,12 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
 	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 333);
 	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 341);
-	
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
-
-    strcpy(manifest_buffer, (char *)decrypt.plaintext);
-
     printf("PLAINTEXT: %s\n", decrypt.plaintext);
     printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
-    printf("MANIFEST BUFFER: %s\n", manifest_buffer);
-    printf("POINTERS: %p %p\n", decrypt.plaintext, manifest_buffer);
 
-    // Declare and structure manifest
+    // Declare and structure manifest for parsing
     manifest_t manifest;
     condition_t preConditions, nextPreCondition, postConditions;
     payloadInfo_t payloadInfo;
@@ -215,23 +207,20 @@ PROCESS_THREAD(update_client, ev, data) {
     manifest.dependencies = &dependencies;
     manifest.options = &options;
     
-    
-    printf("Starting parser\n");
-    manifest_parser(&manifest, manifest_buffer);
-    printf("Manifest version: %d\n", manifest.versionID);
+    // Parse and check manifest
+    manifest_parser(&manifest, (char *)decrypt.plaintext);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
-    printf("Manifest done\n");
     
     if(accept) {
-        printf("Accept!\n");
+        printf("Manifest accepted.\n");
+        // Get image from server
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
         coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
-        printf("Image done\n");
+        // TODO: Decode and decrypt image
         printf("Image data: %s\n", image_buffer);
-        // Check digest
-        printf("\n--Done--\n");
+        // TODO: Check digest of image
     } else {
         printf("Mismatched manifest.\n");
     }
