@@ -43,20 +43,20 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     return;
   }
 
-  FILE *fd = fopen("/home/rzmd/Documents/git-repos/contiki-ng/examples/suitup/client-cert.pem", "rb");
+  /*FILE *fd = fopen("/home/rzmd/Documents/git-repos/contiki-ng/examples/suitup/client-cert.pem", "rb");
   int bytes;
   fseek(fd, *offset, SEEK_CUR);
-  bytes = fread((char*)buffer, 1, preferred_size, fd);
+  bytes = fread((char*)buffer, 1, preferred_size, fd);*/
   
   static int end = 0;
-  /*if(*offset > strlen(image)) {
+  if(*offset > strlen(image)) {
     strncpy((char *)buffer, image + *offset, *offset - strlen(image));  
     end = 1;
   } else {
     strncpy((char *)buffer, image + *offset, preferred_size);
-  }*/
+  }
   
-  strpos += bytes;
+  strpos += preferred_size;
   
   if(strpos > preferred_size) {
     strpos = preferred_size;

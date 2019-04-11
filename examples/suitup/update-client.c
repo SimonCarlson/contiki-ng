@@ -138,9 +138,9 @@ int manifest_checker(manifest_t *manifest) {
 
 
 PROCESS_THREAD(update_client, ev, data) {
+    PROCESS_BEGIN();
     static struct etimer et;
     static coap_endpoint_t server_ep;
-    PROCESS_BEGIN();
     static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
 
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
@@ -215,23 +215,22 @@ PROCESS_THREAD(update_client, ev, data) {
     manifest.dependencies = &dependencies;
     manifest.options = &options;
     
+    
     printf("Starting parser\n");
     manifest_parser(&manifest, manifest_buffer);
     printf("Manifest version: %d\n", manifest.versionID);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
     printf("Manifest done\n");
-
+    
     if(accept) {
         printf("Accept!\n");
-        /*coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
-        char URL[50];
-        strcpy(manifest.payloadInfo->URLDigest->URL, URL);
-        coap_set_header_uri_path(request, URL);
+        coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
+        coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         printf("Image done\n");
         printf("Image data: %s\n", image_buffer);
-        // Check digest*/
+        // Check digest
         printf("\n--Done--\n");
     } else {
         printf("Mismatched manifest.\n");
