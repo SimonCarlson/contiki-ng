@@ -485,7 +485,7 @@ coap_parse_message(coap_message_t *coap_pkt, uint8_t *data, uint16_t data_len)
   unsigned int option_delta = 0;
   size_t option_length = 0;
   
-#ifdef _WITH_OSCORE
+#ifdef WITH_OSCORE
   uint8_t oscore_found = 0;
 #endif /* WITH_OSCORE */
 
