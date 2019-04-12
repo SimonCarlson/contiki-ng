@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "coap-engine.h"
+#include "opt-cose.h"
 
 #define DEBUG 1
 #if DEBUG
@@ -43,34 +44,56 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     return;
   }
 
+  static opt_cose_encrypt_t cose;
+  uint8_t cose_buffer = 0;
+  char *aad = "0011bbcc22dd44ee55ff660077";
+  uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
+  uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  static uint8_t ciphertext_buffer[704+8]; // +8 för tag-len
+
   static int transmit = 0;
   static int file_len;
   FILE *fd = fopen("/home/user/contiki-ng/examples/suitup/client-cert.pem", "rb");
 
   if(!transmit) {
+    // TODO: Open file, read it entirely, COSE encrypt, stateful transfer of encrypted message
     fseek(fd, 0L, SEEK_END);
     file_len = ftell(fd);
     printf("FILE_LEN: %d\n", file_len);
     rewind(fd);
+
+    char plaintext_buffer[file_len];
+    fread(plaintext_buffer, 1, file_len, fd);
+
+    OPT_COSE_Init(&cose);
+	  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
+	  OPT_COSE_SetNonce(&cose, nonce, 7);
+	  OPT_COSE_SetContent(&cose, (uint8_t *)plaintext_buffer, file_len);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, file_len + 8);
+	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
+	  OPT_COSE_Encrypt(&cose, key, 16);
+	  OPT_COSE_Encode(&cose, &cose_buffer);
+
     transmit = 1;
   }
+
+  printf("AFTER ENCRYPT\n");
   
   static int end = 0;
-  int bytes;
-  fseek(fd, *offset, SEEK_CUR);
-  if(*offset > file_len - preferred_size) {
+  if(*offset > cose.ciphertext_len) {
     //strncpy((char *)buffer, image + *offset, *offset - strlen(image));
     printf("LAST OFFSET: %d\n", *offset);
-    bytes = fread(buffer, 1, *offset - file_len, fd);
+    //bytes = fread(buffer, 1, *offset - file_len, fd);
+    memcpy((char *)buffer, (char *)cose.ciphertext + *offset, *offset - cose.ciphertext_len);
     end = 1;
   } else {
     //strncpy((char *)buffer, image + *offset, preferred_size);
-    bytes = fread(buffer, 1, preferred_size, fd);
+    //bytes = fread(buffer, 1, preferred_size, fd);
+    memcpy((char *)buffer, (char *)cose.ciphertext + *offset, preferred_size);
   }
   
   printf("BUFFER: %s\n", buffer);
-  printf("BYTES: %d\n", bytes);
-  strpos += bytes;
+  strpos += preferred_size;
   
   if(strpos > preferred_size) {
     strpos = preferred_size;
