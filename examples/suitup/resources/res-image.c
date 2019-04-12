@@ -43,20 +43,34 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     return;
   }
 
-  /*FILE *fd = fopen("/home/rzmd/Documents/git-repos/contiki-ng/examples/suitup/client-cert.pem", "rb");
-  int bytes;
-  fseek(fd, *offset, SEEK_CUR);
-  bytes = fread((char*)buffer, 1, preferred_size, fd);*/
-  
-  static int end = 0;
-  if(*offset > strlen(image)) {
-    strncpy((char *)buffer, image + *offset, *offset - strlen(image));  
-    end = 1;
-  } else {
-    strncpy((char *)buffer, image + *offset, preferred_size);
+  static int transmit = 0;
+  static int file_len;
+  FILE *fd = fopen("/home/user/contiki-ng/examples/suitup/client-cert.pem", "rb");
+
+  if(!transmit) {
+    fseek(fd, 0L, SEEK_END);
+    file_len = ftell(fd);
+    printf("FILE_LEN: %d\n", file_len);
+    rewind(fd);
+    transmit = 1;
   }
   
-  strpos += preferred_size;
+  static int end = 0;
+  int bytes;
+  fseek(fd, *offset, SEEK_CUR);
+  if(*offset > file_len - preferred_size) {
+    //strncpy((char *)buffer, image + *offset, *offset - strlen(image));
+    printf("LAST OFFSET: %d\n", *offset);
+    bytes = fread(buffer, 1, *offset - file_len, fd);
+    end = 1;
+  } else {
+    //strncpy((char *)buffer, image + *offset, preferred_size);
+    bytes = fread(buffer, 1, preferred_size, fd);
+  }
+  
+  printf("BUFFER: %s\n", buffer);
+  printf("BYTES: %d\n", bytes);
+  strpos += bytes;
   
   if(strpos > preferred_size) {
     strpos = preferred_size;
@@ -76,5 +90,6 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     printf("END: %d\n", *offset >= CHUNKS_TOTAL);
     *offset = -1;
     end = 0;
+    transmit = 0;
   }
 }
