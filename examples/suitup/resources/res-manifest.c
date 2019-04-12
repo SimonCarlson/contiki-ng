@@ -79,7 +79,6 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   //fseek(fd, *offset, SEEK_CUR);
   //bytes = fread((char*)buffer, 1, preferred_size, fd);
   
-  // TODO: Send data from ciphertext instead of manifest buffer
   static int end = 0;
   if(*offset > cose.ciphertext_len) {
     //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  

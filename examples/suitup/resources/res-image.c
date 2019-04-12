@@ -56,7 +56,6 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   FILE *fd = fopen("/home/user/contiki-ng/examples/suitup/client-cert.pem", "rb");
 
   if(!transmit) {
-    // TODO: Open file, read it entirely, COSE encrypt, stateful transfer of encrypted message
     fseek(fd, 0L, SEEK_END);
     file_len = ftell(fd);
     printf("FILE_LEN: %d\n", file_len);
