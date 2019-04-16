@@ -67,7 +67,7 @@
 
 // TODO: Assumption, fix dynamically?
 static char manifest_buffer[512];
-static char image_buffer[512];
+static char image_buffer[1024];
 //char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
 static int image_offset = 0;
@@ -113,10 +113,10 @@ void image_callback(coap_message_t *response) {
     const uint8_t *chunk;
 
     coap_get_payload(response, &chunk);
-    int copied_bytes = strlen((char *)chunk);
-    printf("BYTES: %d\n", copied_bytes);
-    strncpy(image_buffer + image_offset, (char *)chunk, copied_bytes);
-    image_offset += copied_bytes;
+    //int copied_bytes = strlen((char *)chunk);
+    printf("RECEIVED: %s\n", chunk);
+    memcpy(image_buffer + image_offset, (char *)chunk, 32);
+    image_offset += 32;
 }
 
 
@@ -217,10 +217,31 @@ PROCESS_THREAD(update_client, ev, data) {
         printf("Manifest accepted.\n");
         // Get image from server
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
-        coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        //coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        coap_set_header_uri_path(request, "update/image");
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         // TODO: Decode and decrypt image
-        printf("Image data: %s\n", image_buffer);
+        
+        opt_cose_encrypt_t decrypt;
+	    char *aad2 = "0011bbcc22dd44ee55ff660077";
+	    uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+	    uint8_t buffer2 = 0;
+        uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
+        uint8_t decrypt_buffer2[704];
+        printf("Image buffer: ");
+        PRINTF_HEX((unsigned char *)image_buffer, 712);
+        printf("\n");
+
+        OPT_COSE_Init(&decrypt);
+	    OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
+	    OPT_COSE_SetNonce(&decrypt, nonce, 7);
+	    OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
+	    OPT_COSE_SetContent(&decrypt, decrypt_buffer2, 704);
+	    OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)image_buffer, 712);
+	    OPT_COSE_Decode(&decrypt, &buffer2, 1);
+	    OPT_COSE_Decrypt(&decrypt, key2, 16);
+        printf("PLAINTEXT: %s\n", decrypt.plaintext);
+        printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
         // TODO: Check digest of image
     } else {
         printf("Mismatched manifest.\n");
