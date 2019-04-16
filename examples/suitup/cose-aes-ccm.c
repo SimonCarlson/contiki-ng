@@ -72,13 +72,13 @@ set_iv(uint8_t *iv,
 /* XORs the block m[pos] ... m[pos + 15] with K_{counter} */
 static void
 ctr_step(const uint8_t *nonce,
-    uint8_t pos,
+    uint16_t pos,
     uint8_t *m_and_result,
-    uint8_t m_len,
+    uint16_t m_len,
     uint8_t counter)
 {
   uint8_t a[AES_128_BLOCK_SIZE];
-  uint8_t i;
+  uint16_t i;
   
   set_iv(a, CCM_STAR_ENCRYPTION_FLAGS, nonce, counter);
   AES_128.encrypt(a);
@@ -90,14 +90,14 @@ ctr_step(const uint8_t *nonce,
 /*---------------------------------------------------------------------------*/
 static void
 mic(const uint8_t *nonce,
-    const uint8_t *m, uint8_t m_len,
+    const uint8_t *m, uint16_t m_len,
     const uint8_t *a, uint8_t a_len,
     uint8_t *result,
     uint8_t mic_len)
 {
   uint8_t x[AES_128_BLOCK_SIZE];
-  uint8_t pos;
-  uint8_t i;
+  uint16_t pos;
+  uint16_t i;
   
   
   set_iv(x, CCM_STAR_AUTH_FLAGS(a_len, mic_len), nonce, m_len);
@@ -139,10 +139,10 @@ mic(const uint8_t *nonce,
 }
 /*---------------------------------------------------------------------------*/
 static void
-ctr(const uint8_t *nonce, uint8_t *m, uint8_t m_len)
+ctr(const uint8_t *nonce, uint8_t *m, uint16_t m_len)
 {
-  uint8_t pos;
-  uint8_t counter;
+  uint16_t pos;
+  uint16_t counter;
   
   pos = 0;
   counter = 1;
@@ -160,7 +160,7 @@ set_key(const uint8_t *key)
 /*---------------------------------------------------------------------------*/
 static void
 aead(const uint8_t* nonce,
-    uint8_t* m, uint8_t m_len,
+    uint8_t* m, uint16_t m_len,
     const uint8_t* a, uint8_t a_len,
     uint8_t *result, uint8_t mic_len,
     int forward)

@@ -76,7 +76,7 @@ struct cose_aes_ccm_driver {
    * \param forward != 0 if used in forward direction.
    */
   void (* aead)(const uint8_t* nonce,
-      uint8_t* m, uint8_t m_len,
+      uint8_t* m, uint16_t m_len,
       const uint8_t* a, uint8_t a_len,
       uint8_t *result, uint8_t mic_len,
       int forward);
