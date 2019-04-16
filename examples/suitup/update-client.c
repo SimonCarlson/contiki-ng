@@ -102,9 +102,9 @@ void manifest_callback(coap_message_t *response) {
     const uint8_t *chunk;
 
     coap_get_payload(response, &chunk);
-    int copied_bytes = strlen((char *)chunk);
-    strncpy(manifest_buffer + manifest_offset, (char *)chunk, copied_bytes);
-    manifest_offset += copied_bytes;
+    //int copied_bytes = strlen((char *)chunk);
+    memcpy(manifest_buffer + manifest_offset, (char *)chunk, 32);
+    manifest_offset += 32;
 }
 
 
@@ -175,7 +175,7 @@ PROCESS_THREAD(update_client, ev, data) {
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
 	char *aad2 = "0011bbcc22dd44ee55ff660077";
-	uint8_t decrypt_buffer[333];
+	uint8_t decrypt_buffer[327];
 	uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
@@ -184,8 +184,8 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
 	OPT_COSE_SetNonce(&decrypt, nonce, 7);
 	OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
-	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 333);
-	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 341);
+	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 327);
+	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 335);
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
     printf("PLAINTEXT: %s\n", decrypt.plaintext);
@@ -211,6 +211,7 @@ PROCESS_THREAD(update_client, ev, data) {
     manifest_parser(&manifest, (char *)decrypt.plaintext);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
+    printf("Accept: %d\n", accept);
     
     if(accept) {
         printf("Manifest accepted.\n");
