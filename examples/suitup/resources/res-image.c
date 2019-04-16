@@ -27,35 +27,53 @@ RESOURCE(res_image,
          NULL);
 
 #define CHUNKS_TOTAL 600000
+#define SUITUP_COOJA
 
-char *image = "This is a payload message! This is a payload message! This is a payload message! This is a payload message! This is a payload message!";
+#define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
+void oscoap_printf_hex(unsigned char*, unsigned int);
+
+char *message = "-----BEGIN CERTIFICATE-----\n"
+"MIIB2zCCAYKgAwIBAgIUJsaFHt1DXPxkxCchzB6a2kROqZwwCgYIKoZIzj0EAwIw\n"
+"RTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGElu\n"
+"dGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0xOTAzMjYxMjMzMDhaFw0yMDAzMjUx\n"
+"MjMzMDhaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYD\n"
+"VQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwVjAQBgcqhkjOPQIBBgUrgQQA\n"
+"CgNCAARpcQ0ZoXjob3wJcqo7Lr4z/+hE1GzEnHOY7ZOYSHZYyhPZl4qdRZfVBfs2\n"
+"Jr6mvGh5bzJ/MgJNaQwjSii88zyco1MwUTAdBgNVHQ4EFgQUjNG0dbntVPQhBsZx\n"
+"4zmtlcO4o4gwHwYDVR0jBBgwFoAUjNG0dbntVPQhBsZx4zmtlcO4o4gwDwYDVR0T\n"
+"AQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiBGoymLDOS+4FKPPy8+S8I7Bhz6\n"
+"w1XvfvyW7+6jK9r/MQIgMK+T3BlnRHqcubSJFDek8SNj4ZyDXz8OCmYS92ehaFQ=\n"
+"-----END CERTIFICATE-----\n";
+
+
 
 static void
 res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("IMAGE RESOURCE\n");
-  int32_t strpos = 0;
-  printf("OFFSET: %d\n", *offset);
-  if(*offset >= CHUNKS_TOTAL) {
-    printf("Bad option\n");
-    coap_set_status_code(response, BAD_OPTION_4_02);
-    const char *error_msg = "BlockOutOfScope";
-    coap_set_payload(response, error_msg, strlen(error_msg));
-    return;
-  }
-
+  static int transmit = 0;
+  uint8_t data[335];
   static opt_cose_encrypt_t cose;
   uint8_t cose_buffer = 0;
   char *aad = "0011bbcc22dd44ee55ff660077";
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
   uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  static uint8_t ciphertext_buffer[704+8]; // +8 för tag-len
-
-  static int transmit = 0;
-  static int file_len;
-  FILE *fd = fopen("/home/user/contiki-ng/examples/suitup/client-cert.pem", "rb");
-
+  static uint8_t ciphertext_buffer[704 + 9]; // +8 för tag-len
+  int32_t strpos = 0;
+  
+  printf("OFFSET: %d\n", *offset);
+  if(*offset >= CHUNKS_TOTAL) {
+    coap_set_status_code(response, BAD_OPTION_4_02);
+    const char *error_msg = "BlockOutOfScope";
+    coap_set_payload(response, error_msg, strlen(error_msg));
+    return;
+  }
+  
   if(!transmit) {
+#ifndef SUITUP_COOJA
+    int file_len;
+    printf("Opening file\n");
+    FILE *fd = fopen("/home/user/contiki-ng/examples/suitup/client-cert.pem", "rb");
     fseek(fd, 0L, SEEK_END);
     file_len = ftell(fd);
     printf("FILE_LEN: %d\n", file_len);
@@ -63,35 +81,44 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
 
     char plaintext_buffer[file_len];
     fread(plaintext_buffer, 1, file_len, fd);
+#endif
 
-    OPT_COSE_Init(&cose);
+	  OPT_COSE_Init(&cose);
 	  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
 	  OPT_COSE_SetNonce(&cose, nonce, 7);
-	  OPT_COSE_SetContent(&cose, (uint8_t *)plaintext_buffer, file_len);
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, file_len + 8);
+#ifdef SUITUP_COOJA
+	  OPT_COSE_SetContent(&cose, (uint8_t *)message, strlen(message));
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, strlen(message) + 9);
+#endif
+#ifndef SUITUP_COOJA
+    OPT_COSE_SetContent(&cose, (uint8_t *)plaintext_buffer, file_len);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, file_len + 9);
+#endif
 	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
 	  OPT_COSE_Encrypt(&cose, key, 16);
 	  OPT_COSE_Encode(&cose, &cose_buffer);
-
+    //memcpy(data, cose.ciphertext, cose.ciphertext_len);
+    printf("Ciphertext: ");
+    PRINTF_HEX(cose.ciphertext, cose.ciphertext_len);
+    printf("\n");
     transmit = 1;
   }
 
-  printf("AFTER ENCRYPT\n");
+  // TODO: Why does this prevent stack smashing?? What is even happening to the stack
+  printf("DATA LEN: %d\n", strlen((char *)data));
+
   
   static int end = 0;
-  if(*offset > cose.ciphertext_len) {
-    //strncpy((char *)buffer, image + *offset, *offset - strlen(image));
-    printf("LAST OFFSET: %d\n", *offset);
-    //bytes = fread(buffer, 1, *offset - file_len, fd);
-    memcpy((char *)buffer, (char *)cose.ciphertext + *offset, *offset - cose.ciphertext_len);
-    end = 1;
-  } else {
-    //strncpy((char *)buffer, image + *offset, preferred_size);
-    //bytes = fread(buffer, 1, preferred_size, fd);
+  if(cose.ciphertext_len - *offset > 32) {
+    //strncpy((char *)buffer, manifest + *offset, preferred_size);
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, preferred_size);
+  } else {
+    //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
+    printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
+    memcpy((char *)buffer, (char *)cose.ciphertext + *offset, cose.ciphertext_len - *offset);
+    end = 1;
   }
   
-  printf("BUFFER: %s\n", buffer);
   strpos += preferred_size;
   
   if(strpos > preferred_size) {
@@ -106,10 +133,10 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   // Update offset for next pass
   *offset += strpos;
   //printf("FEOF: %d\n", feof(fd));
-  // End block transmission if exceeding some limit or EOF found in image file
+  // End block transmission if exceeding some limit or EOF found in manifest file
   if(*offset >= CHUNKS_TOTAL || end == 1){// || feof(fd)) {
     // End of block transfer
-    printf("END: %d\n", *offset >= CHUNKS_TOTAL);
+    printf("END\n");
     *offset = -1;
     end = 0;
     transmit = 0;
