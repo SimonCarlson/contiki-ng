@@ -46,10 +46,10 @@
 #include "coap-blocking-api.h"
 #include "coap-keystore-simple.h"
 #include "rpl.h"
-//#include "dev/sha256.h"
 #include "manifest-parser.h"
 #include "opt-cose.h"
-//#include "coap-callback-api.h"
+#include "os/net/security/tinydtls/tinydtls.h"
+#include "os/net/security/tinydtls/sha2/sha2.h"
 
 /* Log configuration */
 #include "coap-log.h"
@@ -74,6 +74,8 @@ static int image_offset = 0;
 
 #define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
 void oscoap_printf_hex(unsigned char*, unsigned int);
+void printf_char(unsigned char*, unsigned int);
+void printf_hex(unsigned char*, unsigned int);
 
 struct value_t {
     char value[256];        // Digest is SHA-256, needs to fit
@@ -240,9 +242,21 @@ PROCESS_THREAD(update_client, ev, data) {
 	    OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)image_buffer, 712);
 	    OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	    OPT_COSE_Decrypt(&decrypt, key2, 16);
-        printf("PLAINTEXT: %s\n", decrypt.plaintext);
-        printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
+        printf("IMAGE STRLEN: %d\n", strlen(image_buffer));
+        //printf("PLAINTEXT: %s\n", decrypt.plaintext);
+        //printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
+        
         // TODO: Check digest of image
+        dtls_sha256_ctx ctx;
+	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
+
+	    dtls_sha256_init(&ctx);
+	    dtls_sha256_update(&ctx, (uint8_t *) decrypt.plaintext, decrypt.plaintext_len);
+	    dtls_sha256_final(chksum, &ctx);
+
+	    printf("CHKSUM: ");
+	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
+	    printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
     } else {
         printf("Mismatched manifest.\n");
     }
@@ -473,4 +487,22 @@ void print_manifest(manifest_t *manifest) {
     printf("PRECURSORS: %s %s\n", manifest->precursorImage->URL, manifest->precursorImage->digest);
     printf("DEPENDENCIES: %s %s\n", manifest->dependencies->URL, manifest->dependencies->digest);
     printf("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
+}
+
+void printf_char(unsigned char *data, unsigned int len){
+	unsigned int i=0;
+	for(i=0; i<len; i++)
+	{
+		printf("%c ",data[i]);
+	}
+	printf("\n");
+}
+
+void printf_hex(unsigned char *data, unsigned int len){
+	unsigned int i=0;
+	for(i=0; i<len; i++)
+	{
+		printf("%02x ",data[i]);
+	}
+	printf("\n");
 }
