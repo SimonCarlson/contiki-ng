@@ -93,7 +93,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
     printf("\n");
   } else {
     //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
-    printf("LAST COPY: %d bytes\n", *offset - cose.ciphertext_len);
+    printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, cose.ciphertext_len - *offset);
     printf("SENDING: ");
     PRINTF_HEX(buffer, cose.ciphertext_len - *offset);
