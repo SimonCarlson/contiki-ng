@@ -46,7 +46,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   PRINTF("MANIFEST RESOURCE\n");
   int32_t strpos = 0;
 
-  printf("OFFSET: %d\n", *offset);
+  //printf("OFFSET: %d\n", *offset);
   if(*offset >= CHUNKS_TOTAL) {
     coap_set_status_code(response, BAD_OPTION_4_02);
     const char *error_msg = "BlockOutOfScope";
@@ -83,7 +83,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   //fseek(fd, *offset, SEEK_CUR);
   //bytes = fread((char*)buffer, 1, preferred_size, fd);
   
-  printf("COSE: %d OFFSET: %d\n", cose.ciphertext_len, *offset);
+  //printf("COSE: %d OFFSET: %d\n", cose.ciphertext_len, *offset);
   static int end = 0;
   if(cose.ciphertext_len - *offset > 32) {
     //strncpy((char *)buffer, manifest + *offset, preferred_size);
@@ -93,12 +93,12 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
     printf("\n");
   } else {
     //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
-    printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
+    //printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, cose.ciphertext_len - *offset);
     printf("SENDING: ");
     PRINTF_HEX(buffer, cose.ciphertext_len - *offset);
     printf("\n");
-    printf("LAST LENGTH: %d LAST BUFFER: %s\n", cose.ciphertext_len - *offset, buffer);
+    //printf("LAST LENGTH: %d LAST BUFFER: %s\n", cose.ciphertext_len - *offset, buffer);
     end = 1;
   }
   

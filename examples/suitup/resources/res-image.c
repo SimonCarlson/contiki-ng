@@ -61,7 +61,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   static uint8_t ciphertext_buffer[704 + 9]; // +8 för tag-len
   int32_t strpos = 0;
   
-  printf("OFFSET: %d\n", *offset);
+  //printf("OFFSET: %d\n", *offset);
   if(*offset >= CHUNKS_TOTAL) {
     coap_set_status_code(response, BAD_OPTION_4_02);
     const char *error_msg = "BlockOutOfScope";
@@ -114,7 +114,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, preferred_size);
   } else {
     //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
-    printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
+    //printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, cose.ciphertext_len - *offset);
     end = 1;
   }
