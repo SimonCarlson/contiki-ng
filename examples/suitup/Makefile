@@ -12,7 +12,7 @@ MODULES_REL += ./resources
 MODULES_REL += $(TARGET)
 
 # Include the CoAP implementation
-MODULES += os/net/app-layer/coap
+MODULES += os/net/app-layer/coap os/services/shell
 PROJECT_SOURCEFILES += opt-cose.c opt-cbor.c cose-aes-ccm.c
 include $(CONTIKI)/Makefile.include
 
