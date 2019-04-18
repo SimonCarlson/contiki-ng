@@ -57,16 +57,17 @@
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
 /* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
-#define SERVER_EP "coap://[fe80::201:1:1:1]"
+//#define SERVER_EP "coap://[fe80::201:1:1:1]"
+#define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
 //#define SERVER_EP "coap://[fd00::302:304:506:708]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
-#define INTERVAL 1
+#define INTERVAL 3
 #define TIMEOUT 1
 
 // TODO: Assumption, fix dynamically?
-static char manifest_buffer[512];
+static char manifest_buffer[412];
 static char image_buffer[1024];
 //char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
@@ -123,6 +124,7 @@ void image_callback(coap_message_t *response) {
 
 
 int manifest_checker(manifest_t *manifest) {
+    printf("MANIFEST CHECKER: %s\n", manifest->preConditions->value);
     // Check pre conditions etc
     if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
         printf("Mismatched vendor ID.\n");
@@ -155,8 +157,11 @@ PROCESS_THREAD(update_client, ev, data) {
 
     // Connect to server endpoint
     coap_endpoint_connect(&server_ep);
-    etimer_set(&et, CLOCK_SECOND * INTERVAL);
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+    while(!coap_endpoint_is_connected(&server_ep)) {
+        etimer_set(&et, CLOCK_SECOND * INTERVAL);
+        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+        printf("Checking connection again\n");
+    }
     printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
     
     // Register to server
@@ -166,7 +171,7 @@ PROCESS_THREAD(update_client, ev, data) {
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     int bytes = coap_set_header_uri_query(request, query_data); 
     printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
-    COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
+    //COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
     printf("Registration done\n");
 
     // Get manifest from server
@@ -177,11 +182,11 @@ PROCESS_THREAD(update_client, ev, data) {
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
 	char *aad2 = "0011bbcc22dd44ee55ff660077";
-	uint8_t decrypt_buffer[327];
+	uint8_t decrypt_buffer[328];
 	uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
-
+    
 	OPT_COSE_Init(&decrypt);
 	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
 	OPT_COSE_SetNonce(&decrypt, nonce, 7);
@@ -190,8 +195,13 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 335);
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
-    printf("PLAINTEXT: %s\n", decrypt.plaintext);
+    // Null-terminate plaintext?
+    decrypt_buffer[327] = 0;
+    /*printf("PLAINTEXT: %s\n", decrypt.plaintext);
     printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
+    printf("PLAINTEXT HEX:\n");
+    PRINTF_HEX(decrypt.plaintext, decrypt.plaintext_len);
+    printf("\n");*/
 
     // Declare and structure manifest for parsing
     manifest_t manifest;
@@ -208,9 +218,13 @@ PROCESS_THREAD(update_client, ev, data) {
     manifest.precursorImage = &precursorImage;
     manifest.dependencies = &dependencies;
     manifest.options = &options;
-    
+
     // Parse and check manifest
     manifest_parser(&manifest, (char *)decrypt.plaintext);
+    printf("Manifest address: %p\n", &manifest);
+    printf("Precond 1 address: %p\n", manifest.preConditions);
+    printf("Precond 2 address: %p\n", manifest.preConditions->next);
+    printf("Precond 1 type: %d\n", manifest.preConditions->type);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
     printf("Accept: %d\n", accept);
@@ -242,11 +256,8 @@ PROCESS_THREAD(update_client, ev, data) {
 	    OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)image_buffer, 712);
 	    OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	    OPT_COSE_Decrypt(&decrypt, key2, 16);
-        printf("IMAGE STRLEN: %d\n", strlen(image_buffer));
-        //printf("PLAINTEXT: %s\n", decrypt.plaintext);
-        //printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
         
-        // TODO: Check digest of image
+        
         dtls_sha256_ctx ctx;
 	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
 
@@ -265,13 +276,14 @@ PROCESS_THREAD(update_client, ev, data) {
 }
 
 void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
-    printf("Parsing at %p: %s\n", manifest_string, manifest_string);
+    //printf("Parsing at %p: %s\n", manifest_string, manifest_string);
     char *cur_pos = manifest_string;
     int key;
     char *val;
     // Traverse the manifest
     while(*cur_pos != '\0') {
         key = get_next_key(&cur_pos);
+        printf("KEY: %d\n", key);
         switch(key) {
             case 0:
                 // VERSION ID
@@ -283,6 +295,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
             case 1:
                 // SEQUENCE NUMBER
                 val = get_next_value(&cur_pos);
+                printf("SEQUENCE NUMBER: %s\n", val);
                 manifest_p->sequenceNumber = atoi(val);
                 memb_free(&manifestValue, val);
                 //free(val);
@@ -414,10 +427,16 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
 
 int get_next_key(char **buffer) {
     char check; // Will hold the candidate for the key value
-    while(**buffer != '\0') {
+    //printf("Current char: %d\n", **buffer);
+    printf("COMPARISON: %d\n", **buffer > 0);
+    //printf("BUFFER: %s\n", *buffer);
+    while(**buffer > 0) {
         check = (*buffer)[1];
+        printf("%c ", check);
         // Check for the pattern "X" where X is a digit
+        printf("First and third chars: %c %c\n", **buffer, *(*buffer + 2));
         if(**buffer == '"' && is_digit(&check) && *(*buffer + 2) == '"') {
+            printf("Found pattern %c %c %c\n", **buffer, check, *(*buffer + 2));
             // Advance the buffer past the current key, to the value (skipping the ':')
             *buffer += 4;
             return atoi(&check);
@@ -425,6 +444,7 @@ int get_next_key(char **buffer) {
             (*buffer)++;
         }
     }
+    printf("BUFFER == '\\0'\n");
     return -1;
 }
 
@@ -463,13 +483,24 @@ char *get_next_value(char **buffer) {
 
 
 int is_digit(char *c) {
-    while(*c != '\0') {
+    /*printf("IS DIGIT CHECKING %c at %p, ", *c, c);
+    while(c != NULL) {
+        printf("*c: %c\n", *c);
+        printf("Trying *c < '0': %d\n", *c < '0');
+        printf("Trying *c > '9': %d\n", *c > '9');
         if(*c < '0' || *c > '9') {
+            printf(" OUTCOME NO\n");
             return 0;
         }
-        c++;
+        //c++;
     }
-    return 1;
+    printf(" OUTCOME YES\n");
+    return 1;*/
+    if(*c < '0' || *c > '9') {
+        return 0;
+    } else {
+        return 1;
+    }
 }
 
 
@@ -479,6 +510,7 @@ void print_manifest(manifest_t *manifest) {
     printf("VERSION: %d\n", manifest->versionID);
     printf("SEQUENCE: %d\n", manifest->sequenceNumber);
     printf("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
+    printf("A print before second precond\n");
     printf("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
     printf("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
     printf("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
