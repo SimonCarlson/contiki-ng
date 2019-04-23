@@ -172,7 +172,7 @@ aead(const uint8_t* nonce,
     printf("Decrypting!\n");
   }
 
-  printf("Nonce: ");
+  /*printf("Nonce: ");
   for(int i = 0; i < 7; i++) {
     printf("%d ", nonce[i]);
   }
@@ -185,7 +185,7 @@ aead(const uint8_t* nonce,
   for(int i = 0; i < a_len; i++) {
     printf("%02x ", a[i]);
   }
-  printf("\nAAD len: %d\n", a_len);
+  printf("\nAAD len: %d\n", a_len);*/
   
   if(!forward) {
     /* decrypt */

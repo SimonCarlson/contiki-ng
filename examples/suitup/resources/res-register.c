@@ -43,9 +43,8 @@ res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   if(coap_get_query_variable(request, "vid", &vendor_id)) {
     printf("Vendor id: %s\n", vendor_id);
     //memcpy(buffer, vendor_id, length);
+    //printf("Vendor id: %s\n", vendor_id);
   }
-
-  printf("Vendor id: %s\n", vendor_id);
 
   coap_set_status_code(response, CREATED_2_01);
   memcpy(buffer, message, length);

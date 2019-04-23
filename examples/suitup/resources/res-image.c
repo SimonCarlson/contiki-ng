@@ -58,7 +58,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   char *aad = "0011bbcc22dd44ee55ff660077";
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
   uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  static uint8_t ciphertext_buffer[704 + 9]; // +8 för tag-len
+  static uint8_t ciphertext_buffer[704 + 8]; // +8 för tag-len
   int32_t strpos = 0;
   
   //printf("OFFSET: %d\n", *offset);
@@ -88,14 +88,16 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
 	  OPT_COSE_SetNonce(&cose, nonce, 7);
 #ifdef SUITUP_COOJA
 	  OPT_COSE_SetContent(&cose, (uint8_t *)message, strlen(message));
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, strlen(message) + 9);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, strlen(message) + 8);
 #endif
 #ifndef SUITUP_COOJA
     OPT_COSE_SetContent(&cose, (uint8_t *)plaintext_buffer, file_len);
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, file_len + 9);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, file_len + 8);
 #endif
 	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
+    printf("Encrypting image data\n");
 	  OPT_COSE_Encrypt(&cose, key, 16);
+    printf("Encoding image data\n");
 	  OPT_COSE_Encode(&cose, &cose_buffer);
     //memcpy(data, cose.ciphertext, cose.ciphertext_len);
     printf("Ciphertext: ");

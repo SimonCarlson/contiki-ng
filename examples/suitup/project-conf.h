@@ -54,11 +54,11 @@
 
 /* Multiplies with chunk size, be aware of memory constraints. */
 #ifndef COAP_MAX_OPEN_TRANSACTIONS
-#define COAP_MAX_OPEN_TRANSACTIONS     4
+#define COAP_MAX_OPEN_TRANSACTIONS     1
 #endif /* COAP_MAX_OPEN_TRANSACTIONS */
 
 /* Must be <= open transactions, default is COAP_MAX_OPEN_TRANSACTIONS-1. */
-/* #define COAP_MAX_OBSERVERS             2 */
+#define COAP_CONF_MAX_OBSERVEES             0
 
 /* Filtering .well-known/core per query can be disabled to save space. */
 #define COAP_LINK_FORMAT_FILTERING     0
@@ -66,7 +66,7 @@
 
 /* Enable client-side support for COAP observe */
 #ifndef COAP_OBSERVE_CLIENT
-#define COAP_OBSERVE_CLIENT            1
+#define COAP_OBSERVE_CLIENT            0
 #endif /* COAP_OBSERVE_CLIENT */
 
 #define COAP_DTLS_PSK_DEFAULT_IDENTITY "user"
@@ -74,9 +74,13 @@
 
 //#define LOG_CONF_LEVEL_COAP LOG_LEVEL_DBG
 #define LOG_CONF_LEVEL_MAIN LOG_LEVEL_NONE
-#define QUEUEBUF_CONF_NUM 4
+#define QUEUEBUF_CONF_NUM 3
 #define NBR_TABLE_CONF_MAX_NEIGHBORS 2
-#define NETSTACK_MAX_ROUTE_ENTIRES 4
-#define SICSLOWPAN_CONF_FRAG 0
-#define UIP_CONF_BUFFER_SIZE 280 
+#define NETSTACK_MAX_ROUTE_ENTIRES 2
+#define SICSLOWPAN_CONF_FRAG 1
+#define UIP_CONF_BUFFER_SIZE 280
+
+#define LOG_CONF_LEVEL_COAP LOG_LEVEL_NONE
+
+#define ENERGEST_CONF_ON 1
 #endif /* IOT_UPDATES_PROJECT_CONF */

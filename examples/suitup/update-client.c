@@ -46,6 +46,8 @@
 #include "coap-blocking-api.h"
 #include "coap-keystore-simple.h"
 #include "rpl.h"
+#include "sys/energest.h"
+#include "cfs/cfs.h"    // Coffee filesystem
 #include "manifest-parser.h"
 #include "opt-cose.h"
 #include "os/net/security/tinydtls/tinydtls.h"
@@ -67,8 +69,8 @@
 #define TIMEOUT 1
 
 // TODO: Assumption, fix dynamically?
-static char manifest_buffer[412];
-static char image_buffer[1024];
+static char manifest_buffer[370];
+static char image_buffer[712];
 //char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
 static int image_offset = 0;
@@ -92,11 +94,6 @@ AUTOSTART_PROCESSES(&update_client);
 
 void register_callback(coap_message_t *response) {
     printf("REGISTER CALLBACK\n");
-    const uint8_t *chunk;
-
-    int len = coap_get_payload(response, &chunk);
-
-    printf("Response: %.*s\n", len, (char *)chunk);
 }
 
 
@@ -117,7 +114,11 @@ void image_callback(coap_message_t *response) {
 
     coap_get_payload(response, &chunk);
     //int copied_bytes = strlen((char *)chunk);
-    printf("RECEIVED: %s\n", chunk);
+    printf("RECEIVED: ");
+    for(int i = 0; i < 32; i++) {
+        printf("%02x ", chunk[i]);
+    }
+    printf("\n");
     memcpy(image_buffer + image_offset, (char *)chunk, 32);
     image_offset += 32;
 }
@@ -142,6 +143,7 @@ int manifest_checker(manifest_t *manifest) {
 
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
+    printf("Client starting\n");
     static struct etimer et;
     static coap_endpoint_t server_ep;
     static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
@@ -161,17 +163,20 @@ PROCESS_THREAD(update_client, ev, data) {
         etimer_set(&et, CLOCK_SECOND * INTERVAL);
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
         printf("Checking connection again\n");
+        coap_endpoint_connect(&server_ep);
     }
     printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
-    
+    coap_endpoint_connect(&server_ep);
+
     // Register to server
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
     // Copy POST data into buffer
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
-    int bytes = coap_set_header_uri_query(request, query_data); 
-    printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
-    //COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
+    coap_set_header_uri_query(request, query_data); 
+    //printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
+    // TODO: On firefly this doesnt seem to work but rather times out
+    COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
     printf("Registration done\n");
 
     // Get manifest from server
@@ -197,11 +202,11 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
     // Null-terminate plaintext?
     decrypt_buffer[327] = 0;
-    /*printf("PLAINTEXT: %s\n", decrypt.plaintext);
+    printf("PLAINTEXT: %s\n", decrypt.plaintext);
     printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
     printf("PLAINTEXT HEX:\n");
     PRINTF_HEX(decrypt.plaintext, decrypt.plaintext_len);
-    printf("\n");*/
+    printf("\n");
 
     // Declare and structure manifest for parsing
     manifest_t manifest;
@@ -221,10 +226,6 @@ PROCESS_THREAD(update_client, ev, data) {
 
     // Parse and check manifest
     manifest_parser(&manifest, (char *)decrypt.plaintext);
-    printf("Manifest address: %p\n", &manifest);
-    printf("Precond 1 address: %p\n", manifest.preConditions);
-    printf("Precond 2 address: %p\n", manifest.preConditions->next);
-    printf("Precond 1 type: %d\n", manifest.preConditions->type);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
     printf("Accept: %d\n", accept);
@@ -244,9 +245,9 @@ PROCESS_THREAD(update_client, ev, data) {
 	    uint8_t buffer2 = 0;
         uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
         uint8_t decrypt_buffer2[704];
-        printf("Image buffer: ");
-        PRINTF_HEX((unsigned char *)image_buffer, 712);
-        printf("\n");
+        //printf("Image buffer: ");
+        //PRINTF_HEX((unsigned char *)image_buffer, 712);
+        //printf("\n");
 
         OPT_COSE_Init(&decrypt);
 	    OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
@@ -256,6 +257,8 @@ PROCESS_THREAD(update_client, ev, data) {
 	    OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)image_buffer, 712);
 	    OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	    OPT_COSE_Decrypt(&decrypt, key2, 16);
+
+        printf("%s\n", decrypt.plaintext);
         
         
         dtls_sha256_ctx ctx;
@@ -265,9 +268,10 @@ PROCESS_THREAD(update_client, ev, data) {
 	    dtls_sha256_update(&ctx, (uint8_t *) decrypt.plaintext, decrypt.plaintext_len);
 	    dtls_sha256_final(chksum, &ctx);
 
+        //printf("DTLS_SHA256_DIGEST_LENGTH: %d\n", DTLS_SHA256_DIGEST_LENGTH);
 	    printf("CHKSUM: ");
 	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
-	    printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
+	    //printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
     } else {
         printf("Mismatched manifest.\n");
     }
@@ -428,15 +432,11 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
 int get_next_key(char **buffer) {
     char check; // Will hold the candidate for the key value
     //printf("Current char: %d\n", **buffer);
-    printf("COMPARISON: %d\n", **buffer > 0);
     //printf("BUFFER: %s\n", *buffer);
     while(**buffer > 0) {
         check = (*buffer)[1];
-        printf("%c ", check);
         // Check for the pattern "X" where X is a digit
-        printf("First and third chars: %c %c\n", **buffer, *(*buffer + 2));
         if(**buffer == '"' && is_digit(&check) && *(*buffer + 2) == '"') {
-            printf("Found pattern %c %c %c\n", **buffer, check, *(*buffer + 2));
             // Advance the buffer past the current key, to the value (skipping the ':')
             *buffer += 4;
             return atoi(&check);
@@ -510,7 +510,6 @@ void print_manifest(manifest_t *manifest) {
     printf("VERSION: %d\n", manifest->versionID);
     printf("SEQUENCE: %d\n", manifest->sequenceNumber);
     printf("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
-    printf("A print before second precond\n");
     printf("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
     printf("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
     printf("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
