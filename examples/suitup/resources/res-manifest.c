@@ -30,7 +30,7 @@ RESOURCE(res_manifest,
          NULL);
   
 #define CHUNKS_TOTAL 2050 // How to determine? Size of file? 
-static char *manifest= "{\"0\": 1, \"1\": \"1553762654\", \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
+static char *manifest= "{\"0\": 1, \"1\": 1555415686, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"},{\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3,\"1\": 704, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\":\"8c2859fca075e24d1a79d0b6cdfdfe5c07da8c203a892700538efd96f789b355\"}]}, \"6\": [], \"7\": [],\"8\": []}";
 
 static void
 res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
@@ -42,7 +42,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   char *aad = "0011bbcc22dd44ee55ff660077";
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
   uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  static uint8_t ciphertext_buffer[335]; // +8 för tag-len
+  static uint8_t ciphertext_buffer[330]; // +8 för tag-len
   PRINTF("MANIFEST RESOURCE\n");
   int32_t strpos = 0;
 
@@ -54,17 +54,21 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
     return;
   }
 
-  printf("STRLEN: %d\n", strlen(manifest));
+  printf("Manifest: %s\n", manifest);
+  printf("STRLEN: %d\n", 322);
   if(!transmit) {
 	  OPT_COSE_Init(&cose);
 	  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
 	  OPT_COSE_SetNonce(&cose, nonce, 7);
-	  OPT_COSE_SetContent(&cose, (uint8_t *)manifest, strlen(manifest));
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, 335);
+	  OPT_COSE_SetContent(&cose, (uint8_t *)manifest, 322);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, 330);
 	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
 	  OPT_COSE_Encrypt(&cose, key, 16);
 	  OPT_COSE_Encode(&cose, &cose_buffer);
     //memcpy(data, cose.ciphertext, cose.ciphertext_len);
+    printf("Ciphertext manifest: \n");
+    PRINTF_HEX(ciphertext_buffer, 330);
+    printf("\n");
     transmit = 1;
   }
 

@@ -103,6 +103,11 @@ void manifest_callback(coap_message_t *response) {
     const uint8_t *chunk;
 
     coap_get_payload(response, &chunk);
+    printf("RECEIVED: ");
+    for(int i = 0; i < 32; i++) {
+        printf("%02x ", chunk[i]);
+    }
+    printf("\n");
     //int copied_bytes = strlen((char *)chunk);
     memcpy(manifest_buffer + manifest_offset, (char *)chunk, 32);
     manifest_offset += 32;
@@ -152,6 +157,7 @@ void image_callback(coap_message_t *response) {
     printf("alt len: %d\n", strlen((char *)decrypt.plaintext));
     
     int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
+    // TODO: Open a file in append-mode, append the data instead of putting it in a buffer
     memcpy(image_buffer + image_offset, decrypt.plaintext, length);
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
     
@@ -203,7 +209,6 @@ PROCESS_THREAD(update_client, ev, data) {
         coap_endpoint_connect(&server_ep);
     }
     printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
-    coap_endpoint_connect(&server_ep);
 
     // Register to server
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
@@ -221,10 +226,14 @@ PROCESS_THREAD(update_client, ev, data) {
     coap_set_header_uri_path(request, "update/manifest");
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
 
+    printf("Ciphertext manifest: \n");
+    PRINTF_HEX((uint8_t*)manifest_buffer, 330);
+    printf("\n");
+
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
 	char *aad2 = "0011bbcc22dd44ee55ff660077";
-	uint8_t decrypt_buffer[328];
+	uint8_t decrypt_buffer[323];
 	uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
@@ -233,12 +242,12 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
 	OPT_COSE_SetNonce(&decrypt, nonce, 7);
 	OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
-	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 327);
-	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 335);
+	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 322);
+	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 330);
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
     // Null-terminate plaintext?
-    decrypt_buffer[327] = 0;
+    decrypt_buffer[322] = 0;
     printf("PLAINTEXT: %s\n", decrypt.plaintext);
     printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
     printf("PLAINTEXT HEX:\n");
@@ -291,10 +300,18 @@ PROCESS_THREAD(update_client, ev, data) {
         dtls_sha256_update(&ctx, (uint8_t *)image_buffer + 696, 8);
         printf("ctx buffer: %s\n", ctx.buffer);*/
 	    dtls_sha256_final(chksum, &ctx);
+        printf("digest comparison: %d\n", strcmp(manifest.payloadInfo->URLDigest->digest, (char *)chksum));
 
+        // TODO: One is represented in hex, the other decimal, make them compatible
         //printf("DTLS_SHA256_DIGEST_LENGTH: %d\n", DTLS_SHA256_DIGEST_LENGTH);
 	    printf("CHKSUM: ");
 	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
+        printf("\n digest: ");
+        printf_hex((uint8_t *)manifest.payloadInfo->URLDigest->digest, DTLS_SHA256_DIGEST_LENGTH);
+        
+        for(int i = 0; i < 32; i++) {
+            printf("%c -> %ld", chksum[i], strtol((char *)&chksum[i], NULL, 16));
+        }
 	    //printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
     } else {
         printf("Mismatched manifest.\n");
