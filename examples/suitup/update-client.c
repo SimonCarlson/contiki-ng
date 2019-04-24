@@ -74,6 +74,7 @@ static char image_buffer[712];
 //char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
 static int image_offset = 0;
+dtls_sha256_ctx ctx;
 
 #define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
 void oscoap_printf_hex(unsigned char*, unsigned int);
@@ -144,15 +145,19 @@ void image_callback(coap_message_t *response) {
 
     printf("plaintext: ");
     for(int j = 0; j < 24; j++) {
-        printf("%c", decrypt.plaintext[j]);
+        printf("%02x ", decrypt.plaintext[j]);
     }
     printf("\n");
-    //printf("%s\n", decrypt.plaintext);
-
-    memcpy(image_buffer + image_offset, decrypt.plaintext, 24); // 24 plaintext size
-    image_offset += 24;
-
+    printf("plaintext len: %d\n", decrypt.plaintext_len);
+    printf("alt len: %d\n", strlen((char *)decrypt.plaintext));
     
+    int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
+    memcpy(image_buffer + image_offset, decrypt.plaintext, length);
+    dtls_sha256_update(&ctx, decrypt.plaintext, length);
+    
+    printf("ctx buffer: %s\n", ctx.buffer);
+
+    image_offset += 24;    
 }
 
 
@@ -208,7 +213,7 @@ PROCESS_THREAD(update_client, ev, data) {
     coap_set_header_uri_query(request, query_data); 
     //printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
     // TODO: On firefly this doesnt seem to work but rather times out
-    COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
+    //COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
     printf("Registration done\n");
 
     // Get manifest from server
@@ -264,6 +269,7 @@ PROCESS_THREAD(update_client, ev, data) {
     
     if(accept) {
         printf("Manifest accepted.\n");
+        dtls_sha256_init(&ctx);
         // Get image from server
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
         coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
@@ -277,16 +283,18 @@ PROCESS_THREAD(update_client, ev, data) {
         printf("image buffer length: %d\n", strlen(image_buffer));
         
         
-        //dtls_sha256_ctx ctx;
-	    //uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
-
-	    //dtls_sha256_init(&ctx);
-	    //dtls_sha256_update(&ctx, (uint8_t *) decrypt.plaintext, decrypt.plaintext_len);
-	    //dtls_sha256_final(chksum, &ctx);
+	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
+        /*for(int i = 0; i < 29; i++) {
+            dtls_sha256_update(&ctx, (uint8_t *)image_buffer + i * 24, 24);
+            printf("ctx buffer: %s\n", ctx.buffer);
+        }
+        dtls_sha256_update(&ctx, (uint8_t *)image_buffer + 696, 8);
+        printf("ctx buffer: %s\n", ctx.buffer);*/
+	    dtls_sha256_final(chksum, &ctx);
 
         //printf("DTLS_SHA256_DIGEST_LENGTH: %d\n", DTLS_SHA256_DIGEST_LENGTH);
-	    //printf("CHKSUM: ");
-	    //printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
+	    printf("CHKSUM: ");
+	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
 	    //printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
     } else {
         printf("Mismatched manifest.\n");
