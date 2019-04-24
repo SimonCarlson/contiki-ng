@@ -51,15 +51,14 @@ static void
 res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("IMAGE RESOURCE\n");
-  static int transmit = 0;
-  uint8_t data[335];
-  static opt_cose_encrypt_t cose;
+  uint8_t data[32];
+  opt_cose_encrypt_t cose;
   uint8_t cose_buffer = 0;
   char *aad = "0011bbcc22dd44ee55ff660077";
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
   uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  static uint8_t ciphertext_buffer[704 + 8]; // +8 för tag-len
   int32_t strpos = 0;
+  static int block = 0;
   
   //printf("OFFSET: %d\n", *offset);
   if(*offset >= CHUNKS_TOTAL) {
@@ -68,60 +67,58 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     coap_set_payload(response, error_msg, strlen(error_msg));
     return;
   }
-  
-  if(!transmit) {
-#ifndef SUITUP_COOJA
-    int file_len;
-    printf("Opening file\n");
-    FILE *fd = fopen("/home/user/contiki-ng/examples/suitup/client-cert.pem", "rb");
-    fseek(fd, 0L, SEEK_END);
-    file_len = ftell(fd);
-    printf("FILE_LEN: %d\n", file_len);
-    rewind(fd);
 
-    char plaintext_buffer[file_len];
-    fread(plaintext_buffer, 1, file_len, fd);
-#endif
-
-	  OPT_COSE_Init(&cose);
-	  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
-	  OPT_COSE_SetNonce(&cose, nonce, 7);
-#ifdef SUITUP_COOJA
-	  OPT_COSE_SetContent(&cose, (uint8_t *)message, strlen(message));
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, strlen(message) + 8);
-#endif
-#ifndef SUITUP_COOJA
-    OPT_COSE_SetContent(&cose, (uint8_t *)plaintext_buffer, file_len);
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, file_len + 8);
-#endif
-	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
-    printf("Encrypting image data\n");
-	  OPT_COSE_Encrypt(&cose, key, 16);
-    printf("Encoding image data\n");
-	  OPT_COSE_Encode(&cose, &cose_buffer);
-    //memcpy(data, cose.ciphertext, cose.ciphertext_len);
-    printf("Ciphertext: ");
-    PRINTF_HEX(cose.ciphertext, cose.ciphertext_len);
-    printf("\n");
-    transmit = 1;
+  printf("OFFSET: %ld\n", *offset);
+  //int length = strlen(message) - *offset < preferred_size - 8 ? strlen(message) -
+  //*offset : preferred_size - 8;
+  int length = 24;
+  printf("length: %d\n", length);
+  memcpy(data, message + *offset - 8 * block, length);
+  data[length] = '\0';
+  printf("Data plaintext: ");
+  for(int i = 0; i < length; i++) {
+    printf("%c", data[i]);
   }
+  printf("\n");
+
+  uint8_t ciphertext_buffer[length + 8]; // +8 för tag-len
+  
+  OPT_COSE_Init(&cose);
+  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
+  OPT_COSE_SetNonce(&cose, nonce, 7);
+  OPT_COSE_SetContent(&cose, (uint8_t *)data, length);
+  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, length + 8);
+  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
+  printf("Encrypting image data\n");
+  OPT_COSE_Encrypt(&cose, key, 16);
+  printf("Encoding image data\n");
+  OPT_COSE_Encode(&cose, &cose_buffer);
+  //memcpy(data, cose.ciphertext, cose.ciphertext_len);
+  printf("Ciphertext: ");
+  PRINTF_HEX(cose.ciphertext, cose.ciphertext_len);
+  printf("\n ciphertext len: %d\n", cose.ciphertext_len);
 
   // TODO: Why does this prevent stack smashing?? What is even happening to the stack
-  printf("DATA LEN: %d\n", strlen((char *)data));
+  //printf("DATA LEN: %d\n", strlen((char *)data));
 
   
   static int end = 0;
-  if(cose.ciphertext_len - *offset > 32) {
+  printf("Remaining: %ld\n", strlen(message) - (*offset - 8 * block));
+  if(strlen(message) - (*offset - 8 * block) >= 32) {
     //strncpy((char *)buffer, manifest + *offset, preferred_size);
-    memcpy((char *)buffer, (char *)cose.ciphertext + *offset, preferred_size);
+    memcpy((char *)buffer, (char *)cose.ciphertext, 32);
+    printf("Copy done\n");
   } else {
     //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
     //printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
-    memcpy((char *)buffer, (char *)cose.ciphertext + *offset, cose.ciphertext_len - *offset);
+    printf("Last pass, copying %ld bytes\n", strlen(message) - (*offset - 8 * block));
+    memcpy((char *)buffer, (char *)cose.ciphertext, 32);
+    printf("Setting end to 1\n");
     end = 1;
   }
   
-  strpos += preferred_size;
+  block++;
+  strpos += length + 8;
   
   if(strpos > preferred_size) {
     strpos = preferred_size;
@@ -133,7 +130,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
 
   coap_set_payload(response, buffer, strpos);
   // Update offset for next pass
-  *offset += strpos;
+  *offset += strpos - 8;
   //printf("FEOF: %d\n", feof(fd));
   // End block transmission if exceeding some limit or EOF found in manifest file
   if(*offset >= CHUNKS_TOTAL || end == 1){// || feof(fd)) {
@@ -141,6 +138,6 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     printf("END\n");
     *offset = -1;
     end = 0;
-    transmit = 0;
+    block = 0;
   }
 }

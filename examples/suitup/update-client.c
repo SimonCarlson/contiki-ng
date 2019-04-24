@@ -119,8 +119,40 @@ void image_callback(coap_message_t *response) {
         printf("%02x ", chunk[i]);
     }
     printf("\n");
-    memcpy(image_buffer + image_offset, (char *)chunk, 32);
-    image_offset += 32;
+
+    opt_cose_encrypt_t decrypt;
+    char *aad2 = "0011bbcc22dd44ee55ff660077";
+    uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    uint8_t buffer2 = 0;
+    uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
+    uint8_t decrypt_buffer2[24];
+    //printf("Image buffer: ");
+    //PRINTF_HEX((unsigned char *)image_buffer, 712);
+    //printf("\n");
+
+    //int length = 
+    uint8_t cipher[32];
+    memcpy(cipher, chunk, 32);
+    OPT_COSE_Init(&decrypt);
+    OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
+    OPT_COSE_SetNonce(&decrypt, nonce, 7);
+    OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
+    OPT_COSE_SetContent(&decrypt, decrypt_buffer2, 24);
+    OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)cipher, 32);
+    OPT_COSE_Decode(&decrypt, &buffer2, 1);
+    OPT_COSE_Decrypt(&decrypt, key2, 16);
+
+    printf("plaintext: ");
+    for(int j = 0; j < 24; j++) {
+        printf("%c", decrypt.plaintext[j]);
+    }
+    printf("\n");
+    //printf("%s\n", decrypt.plaintext);
+
+    memcpy(image_buffer + image_offset, decrypt.plaintext, 24); // 24 plaintext size
+    image_offset += 24;
+
+    
 }
 
 
@@ -234,43 +266,27 @@ PROCESS_THREAD(update_client, ev, data) {
         printf("Manifest accepted.\n");
         // Get image from server
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
-        //coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
-        coap_set_header_uri_path(request, "update/image");
+        coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        //coap_set_header_uri_path(request, "update/image");
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         // TODO: Decode and decrypt image
         
-        opt_cose_encrypt_t decrypt;
-	    char *aad2 = "0011bbcc22dd44ee55ff660077";
-	    uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-	    uint8_t buffer2 = 0;
-        uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
-        uint8_t decrypt_buffer2[704];
-        //printf("Image buffer: ");
-        //PRINTF_HEX((unsigned char *)image_buffer, 712);
-        //printf("\n");
+        
 
-        OPT_COSE_Init(&decrypt);
-	    OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
-	    OPT_COSE_SetNonce(&decrypt, nonce, 7);
-	    OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
-	    OPT_COSE_SetContent(&decrypt, decrypt_buffer2, 704);
-	    OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)image_buffer, 712);
-	    OPT_COSE_Decode(&decrypt, &buffer2, 1);
-	    OPT_COSE_Decrypt(&decrypt, key2, 16);
-
-        printf("%s\n", decrypt.plaintext);
+        printf("image buffer: %s\n", image_buffer);
+        printf("image buffer length: %d\n", strlen(image_buffer));
         
         
-        dtls_sha256_ctx ctx;
-	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
+        //dtls_sha256_ctx ctx;
+	    //uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
 
-	    dtls_sha256_init(&ctx);
-	    dtls_sha256_update(&ctx, (uint8_t *) decrypt.plaintext, decrypt.plaintext_len);
-	    dtls_sha256_final(chksum, &ctx);
+	    //dtls_sha256_init(&ctx);
+	    //dtls_sha256_update(&ctx, (uint8_t *) decrypt.plaintext, decrypt.plaintext_len);
+	    //dtls_sha256_final(chksum, &ctx);
 
         //printf("DTLS_SHA256_DIGEST_LENGTH: %d\n", DTLS_SHA256_DIGEST_LENGTH);
-	    printf("CHKSUM: ");
-	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
+	    //printf("CHKSUM: ");
+	    //printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
 	    //printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
     } else {
         printf("Mismatched manifest.\n");
