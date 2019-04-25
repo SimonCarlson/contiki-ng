@@ -70,7 +70,7 @@
 
 // TODO: Assumption, fix dynamically?
 static char manifest_buffer[370];
-static char image_buffer[712];
+//static char image_buffer[712];
 //char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
 static int image_offset = 0;
@@ -158,7 +158,10 @@ void image_callback(coap_message_t *response) {
     
     int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
     // TODO: Open a file in append-mode, append the data instead of putting it in a buffer
-    memcpy(image_buffer + image_offset, decrypt.plaintext, length);
+    int fd = cfs_open("image", CFS_WRITE | CFS_APPEND);
+    cfs_write(fd, decrypt.plaintext, length);
+    cfs_close(fd);
+    //memcpy(image_buffer + image_offset, decrypt.plaintext, length);
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
     
     printf("ctx buffer: %s\n", ctx.buffer);
@@ -288,8 +291,22 @@ PROCESS_THREAD(update_client, ev, data) {
         
         
 
-        printf("image buffer: %s\n", image_buffer);
-        printf("image buffer length: %d\n", strlen(image_buffer));
+        //printf("image buffer: %s\n", image_buffer);
+        //printf("image buffer length: %d\n", strlen(image_buffer));
+
+        int fd = cfs_open("image", CFS_READ);
+        int length = cfs_seek(fd, 0, CFS_SEEK_END);
+        // TODO: Might have to null-terminate it myself? It appends some garbage (8z) when
+        // printing
+        char output[length + 1];
+        cfs_seek(fd, 0, CFS_SEEK_SET);
+        cfs_read(fd, output, length);
+        cfs_close(fd);
+        output[length] = '\0';
+
+        printf("output: \n");
+        printf("%s\n", output);
+        printf("output strlen: %d\n", strlen(output));
         
         
 	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
@@ -316,6 +333,9 @@ PROCESS_THREAD(update_client, ev, data) {
     } else {
         printf("Mismatched manifest.\n");
     }
+
+    // Remove file? Persistance causes issue for experimental setup
+    cfs_remove("image");
 
   PROCESS_END();
 }
