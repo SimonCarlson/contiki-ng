@@ -68,7 +68,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     return;
   }
 
-  printf("OFFSET: %ld\n", *offset);
+  //printf("OFFSET: %ld\n", *offset);
   //int length = strlen(message) - *offset < preferred_size - 8 ? strlen(message) -
   //*offset : preferred_size - 8;
   int length = 24;
@@ -103,7 +103,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
 
   
   static int end = 0;
-  printf("Remaining: %ld\n", strlen(message) - (*offset - 8 * block));
+  //printf("Remaining: %ld\n", strlen(message) - (*offset - 8 * block));
   if(strlen(message) - (*offset - 8 * block) >= 32) {
     //strncpy((char *)buffer, manifest + *offset, preferred_size);
     memcpy((char *)buffer, (char *)cose.ciphertext, 32);
@@ -111,7 +111,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   } else {
     //strncpy((char *)buffer, manifest + *offset, *offset - strlen(manifest));  
     //printf("LAST COPY: %d bytes\n", cose.ciphertext_len - *offset);
-    printf("Last pass, copying %ld bytes\n", strlen(message) - (*offset - 8 * block));
+    //printf("Last pass, copying %ld bytes\n", strlen(message) - (*offset - 8 * block));
     memcpy((char *)buffer, (char *)cose.ciphertext, 32);
     printf("Setting end to 1\n");
     end = 1;

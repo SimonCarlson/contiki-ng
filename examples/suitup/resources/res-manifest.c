@@ -30,7 +30,7 @@ RESOURCE(res_manifest,
          NULL);
   
 #define CHUNKS_TOTAL 2050 // How to determine? Size of file? 
-static char *manifest= "{\"0\": 1, \"1\": 1555415686, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"},{\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3,\"1\": 704, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\":\"8c2859fca075e24d1a79d0b6cdfdfe5c07da8c203a892700538efd96f789b355\"}]}, \"6\": [], \"7\": [],\"8\": []}";
+static char *manifest= "{\"0\": 1, \"1\": 1555415686, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3, \"1\": 704, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"8c2859fca075e24d1a79d0b6cdfdfe5c07da8c203a892700538efd96f789b355\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 
 static void
 res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
