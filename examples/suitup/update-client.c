@@ -200,7 +200,7 @@ int manifest_checker(manifest_t *manifest) {
 
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
-    printf("Client starting\n");
+    printf("Client started.\n");
     // Persistance sometimes causes issue for experimental setup
     cfs_remove("image");
     static struct etimer et;
@@ -220,7 +220,7 @@ PROCESS_THREAD(update_client, ev, data) {
         printf("Checking connection again.\n");
         coap_endpoint_connect(&server_ep);
     }
-    printf("Client connected? : %d\n", coap_endpoint_is_connected(&server_ep));
+    printf("Client connected.\n");
 
     // Register to well-known endpoint update/register
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
