@@ -165,27 +165,6 @@ aead(const uint8_t* nonce,
     uint8_t *result, uint8_t mic_len,
     int forward)
 {
-  printf("\n");
-  if(forward) {
-    printf("Encrypting!\n");
-  } else {
-    printf("Decrypting!\n");
-  }
-
-  /*printf("Nonce: ");
-  for(int i = 0; i < 7; i++) {
-    printf("%d ", nonce[i]);
-  }
-  printf("\nCipher: ");
-  for(int i = 0; i < m_len; i++) {
-    printf("%02x ", m[i]);
-  }
-  printf("\nCipher len: %d\n", m_len);
-  printf("AAD: ");
-  for(int i = 0; i < a_len; i++) {
-    printf("%02x ", a[i]);
-  }
-  printf("\nAAD len: %d\n", a_len);*/
   
   if(!forward) {
     /* decrypt */

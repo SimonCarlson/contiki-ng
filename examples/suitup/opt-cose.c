@@ -390,7 +390,7 @@ uint8_t OPT_COSE_Decrypt(opt_cose_encrypt_t *cose, uint8_t *key, size_t key_len)
 
 	PRINTF("Decrypting:\n");
 	PRINTF_HEX(cose->ciphertext, cose->ciphertext_len);
-	printf("Cipher len: %d\n", cose->ciphertext_len);
+	PRINTF("Cipher len: %d\n", cose->ciphertext_len);
 	PRINTF("IV: \n");
 	PRINTF_HEX(cose->nonce, cose->nonce_len);
 	PRINTF("Key:\n");
