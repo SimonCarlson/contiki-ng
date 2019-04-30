@@ -222,7 +222,7 @@ uint8_t OPT_COSE_Parse_Attributes(opt_cose_encrypt_t *cose, uint8_t *buffer, uin
 	uint8_t *end_ptr = (uint8_t*)(buffer + len);
 	buffer++; //step by map tag
 	while(buffer < end_ptr ){
-		printf("BUFFER: %c\n", *buffer);
+		PRINTF("BUFFER: %c\n", *buffer);
 		if(*buffer == COSE_Header_KID){//COSE_Header_KID = 2,
 			buffer++; //step by key
 			byte_len = (*buffer & 0x0F);
@@ -345,7 +345,7 @@ uint8_t OPT_COSE_Encrypt(opt_cose_encrypt_t *cose, uint8_t *key, size_t key_len)
 
 	PRINTF("Encrypting:\n");
 	PRINTF("Plaintext:\n");
-	printf("%s\n", cose->plaintext);
+	PRINTF("%s\n", cose->plaintext);
 	PRINTF_HEX(cose->plaintext, cose->plaintext_len);
 	PRINTF("IV/NONCE: \n");
 	PRINTF_HEX(cose->nonce, cose->nonce_len);
