@@ -26,7 +26,7 @@ RESOURCE(res_image,
          NULL,
          NULL);
 
-#define CHUNKS_TOTAL 600000
+#define BLOCKS_TOTAL 11
 #define SUITUP_COOJA
 
 #define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
@@ -61,7 +61,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   static int block = 0;
   
   //printf("OFFSET: %d\n", *offset);
-  if(*offset >= CHUNKS_TOTAL) {
+  if(*offset >= BLOCKS_TOTAL * 32) {
     coap_set_status_code(response, BAD_OPTION_4_02);
     const char *error_msg = "BlockOutOfScope";
     coap_set_payload(response, error_msg, strlen(error_msg));
@@ -72,9 +72,11 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   //int length = strlen(message) - *offset < preferred_size - 8 ? strlen(message) -
   //*offset : preferred_size - 8;
   int length = 24;
+  printf("BLOCK: %d\n", block);
   printf("length: %d\n", length);
-  memcpy(data, message + *offset - 8 * block, length);
-  data[length] = '\0';
+  //memcpy(data, message + *offset - 8 * block, length);
+  snprintf((char*)data, 24, "|%ld||%ld||%ld||%ld||%ld||%ld||%ld||%ld|", *offset, *offset, *offset, *offset, *offset, *offset, *offset, *offset);
+  //data[length] = '\0';
   printf("Data plaintext: ");
   for(int i = 0; i < length; i++) {
     printf("%c", data[i]);
@@ -104,7 +106,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   
   static int end = 0;
   //printf("Remaining: %ld\n", strlen(message) - (*offset - 8 * block));
-  if(strlen(message) - (*offset - 8 * block) >= 32) {
+  if(block < BLOCKS_TOTAL) {
     //strncpy((char *)buffer, manifest + *offset, preferred_size);
     memcpy((char *)buffer, (char *)cose.ciphertext, 32);
     printf("Copy done\n");
@@ -116,6 +118,12 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     printf("Setting end to 1\n");
     end = 1;
   }
+
+  printf("BUFFER: ");
+  for(int i = 0; i < 32; i++) {
+    printf("%02x ", buffer[i]);
+  }
+  printf("\n");
   
   block++;
   strpos += length + 8;
@@ -124,16 +132,20 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
     strpos = preferred_size;
   }
   
-  if(*offset + (int32_t)strpos > CHUNKS_TOTAL) {
+  /*if(*offset + (int32_t)strpos > CHUNKS_TOTAL) {
+    printf("*offset + (int32_t)strpos > CHUNKS_TOTAL\n");
+    printf("Before: %ld\n", strpos);
     strpos = CHUNKS_TOTAL - *offset;
-  }
+    printf("After: %ld\n", strpos);
+  }*/
 
-  coap_set_payload(response, buffer, strpos);
+  // Output from COSE encrypt is always 32 bytes long
+  coap_set_payload(response, buffer, 32);
   // Update offset for next pass
   *offset += strpos - 8;
   //printf("FEOF: %d\n", feof(fd));
   // End block transmission if exceeding some limit or EOF found in manifest file
-  if(*offset >= CHUNKS_TOTAL || end == 1){// || feof(fd)) {
+  if(end){// || feof(fd)) {
     // End of block transfer
     printf("END\n");
     *offset = -1;
