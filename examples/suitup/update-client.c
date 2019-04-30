@@ -58,28 +58,31 @@
 #define LOG_MODULE "client"
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
-/* FIXME: This server address is hard-coded for Cooja and link-local for unconnected border router. */
-//#define SERVER_EP "coap://[fe80::201:1:1:1]"
 #define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
-//#define SERVER_EP "coap://[fd00::302:304:506:708]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
 #define INTERVAL 3
 #define TIMEOUT 1
 
-// TODO: Assumption, fix dynamically?
+#define DEBUG 0
+#if DEBUG
+#define PRINTF(...) printf(__VA_ARGS__)
+#define PRINTF_HEX(data, len) 	printf_hex(data, len)
+#define PRINTF_CHAR(data, len) printf_char(data, len)
+#else
+#define PRINTF(...)
+#define PRINTF_HEX(data, len)
+#define PRINTF_CHAR(data, len)
+#endif
+
+void printf_char(unsigned char*, unsigned int);
+void printf_hex(unsigned char*, unsigned int);
+
 static char manifest_buffer[370];
-//static char image_buffer[712];
-//char *manifest_buffer = "{\"0\": 1, \"1\": 1554114615, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 1, \"1\": 184380, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"ac526296b4f53eed4ab337f158afc12755bd046d0982b4fa227ee09897bc32ef\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 static int manifest_offset = 0;
 static int image_offset = 0;
 dtls_sha256_ctx ctx;
-
-#define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
-void oscoap_printf_hex(unsigned char*, unsigned int);
-void printf_char(unsigned char*, unsigned int);
-void printf_hex(unsigned char*, unsigned int);
 
 struct value_t {
     char value[256];        // Digest is SHA-256, needs to fit
@@ -92,39 +95,53 @@ MEMB(manifestValue, struct value_t, BLOCKS);
 PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
-
-void register_callback(coap_message_t *response) {
-    printf("REGISTER CALLBACK\n");
+void printf_char(unsigned char *data, unsigned int len){
+	unsigned int i=0;
+	for(i=0; i<len; i++)
+	{
+		printf("%c ",data[i]);
+	}
+	printf("\n");
 }
 
+void printf_hex(unsigned char *data, unsigned int len){
+	unsigned int i=0;
+	for(i=0; i<len; i++)
+	{
+		printf("%02x ",data[i]);
+	}
+	printf("\n");
+}
+
+void register_callback(coap_message_t *response) {
+    PRINTF("REGISTER CALLBACK\n");
+}
 
 void manifest_callback(coap_message_t *response) {
-    printf("MANIFEST CALLBACK\n");
+    PRINTF("MANIFEST CALLBACK\n");
     const uint8_t *chunk;
 
     coap_get_payload(response, &chunk);
-    printf("RECEIVED: ");
+    PRINTF("RECEIVED: ");
     for(int i = 0; i < 32; i++) {
-        printf("%02x ", chunk[i]);
+        PRINTF("%02x ", chunk[i]);
     }
-    printf("\n");
-    //int copied_bytes = strlen((char *)chunk);
+    PRINTF("\n");
+    // Reassemble the received ciphertext into a buffer
     memcpy(manifest_buffer + manifest_offset, (char *)chunk, 32);
     manifest_offset += 32;
 }
 
-
 void image_callback(coap_message_t *response) {
-    printf("IMAGE CALLBACK\n");
+    PRINTF("IMAGE CALLBACK\n");
     const uint8_t *chunk;
 
     coap_get_payload(response, &chunk);
-    //int copied_bytes = strlen((char *)chunk);
-    printf("RECEIVED: ");
+    PRINTF("RECEIVED: ");
     for(int i = 0; i < 32; i++) {
-        printf("%02x ", chunk[i]);
+        PRINTF("%02x ", chunk[i]);
     }
-    printf("\n");
+    PRINTF("\n");
 
     opt_cose_encrypt_t decrypt;
     char *aad2 = "0011bbcc22dd44ee55ff660077";
@@ -132,12 +149,9 @@ void image_callback(coap_message_t *response) {
     uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
     uint8_t decrypt_buffer2[24];
-    //printf("Image buffer: ");
-    //PRINTF_HEX((unsigned char *)image_buffer, 712);
-    //printf("\n");
-
-    //int length = 
     uint8_t cipher[32];
+
+    // Decrypt each block
     memcpy(cipher, chunk, 32);
     OPT_COSE_Init(&decrypt);
     OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
@@ -148,44 +162,41 @@ void image_callback(coap_message_t *response) {
     OPT_COSE_Decode(&decrypt, &buffer2, 1);
     OPT_COSE_Decrypt(&decrypt, key2, 16);
 
-    printf("plaintext: ");
+    PRINTF("plaintext: ");
     for(int j = 0; j < 24; j++) {
-        printf("%02x ", decrypt.plaintext[j]);
+        PRINTF("%02x ", decrypt.plaintext[j]);
     }
-    printf("\n");
-    printf("plaintext len: %d\n", decrypt.plaintext_len);
-    printf("alt len: %d\n", strlen((char *)decrypt.plaintext));
+    PRINTF("\n");
+    PRINTF("plaintext len: %d\n", decrypt.plaintext_len);
+    PRINTF("plaintext strlen: %d\n", strlen((char *)decrypt.plaintext));
     
+    // Last block might have less than 24 bytes of data
     int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
-    // TODO: Open a file in append-mode, append the data instead of putting it in a buffer
     int fd = cfs_open("image", CFS_WRITE | CFS_APPEND);
     cfs_write(fd, decrypt.plaintext, length);
     cfs_close(fd);
-    //memcpy(image_buffer + image_offset, decrypt.plaintext, length);
+    // Update digest context with plaintext
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
-    
-    printf("ctx buffer: %s\n", ctx.buffer);
 
+    // Only 24 bytes of data has been written, remaining 8 was tag
     image_offset += 24;    
 }
 
-
 int manifest_checker(manifest_t *manifest) {
-    printf("MANIFEST CHECKER: %s\n", manifest->preConditions->value);
-    // Check pre conditions etc
+    // Check pre conditions, directives in options etc
+    // Here you can implement custom checking for your deployment
     if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
-        printf("Mismatched vendor ID.\n");
+        PRINTF("Mismatched vendor ID.\n");
         return 0;
     }
 
     if(strcmp(manifest->preConditions->next->value, CLASS_ID) != 0) {
-        printf("Mismatched class ID.\n");
+        PRINTF("Mismatched class ID.\n");
         return 0;
     }
 
     return 1;
 }
-
 
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
@@ -195,45 +206,42 @@ PROCESS_THREAD(update_client, ev, data) {
     static struct etimer et;
     static coap_endpoint_t server_ep;
     static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
-    // TODO: Optimize, size of IDs known
     char query_data[90];
 
     coap_engine_init();
     coap_keystore_simple_init();
-
     coap_endpoint_parse(SERVER_EP, strlen(SERVER_EP), &server_ep);
-    LOG_INFO_COAP_EP(&server_ep);
-    LOG_INFO_("\n");
-
+    
     // Connect to server endpoint
     coap_endpoint_connect(&server_ep);
     while(!coap_endpoint_is_connected(&server_ep)) {
         etimer_set(&et, CLOCK_SECOND * INTERVAL);
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-        printf("Checking connection again\n");
+        printf("Checking connection again.\n");
         coap_endpoint_connect(&server_ep);
     }
-    printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
+    printf("Client connected? : %d\n", coap_endpoint_is_connected(&server_ep));
 
-    // Register to server
+    // Register to well-known endpoint update/register
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
-    // Copy POST data into buffer
+    // Copy POST data into buffer for server to make profile of
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     coap_set_header_uri_query(request, query_data); 
-    //printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
-    // TODO: On firefly this doesnt seem to work but rather times out
+    // Register to server
     COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
-    printf("Registration done\n");
+    printf("Registration done.\n");
 
-    // Get manifest from server
+    // Get manifest from well known endpoint update/manifest
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
+    printf("Manifest received.\n");
 
-    printf("Ciphertext manifest: \n");
+    // For comparison with ciphertext hex data on server side
+    PRINTF("Ciphertext manifest: \n");
     PRINTF_HEX((uint8_t*)manifest_buffer, 330);
-    printf("\n");
+    PRINTF("\n");
 
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
@@ -251,13 +259,15 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 330);
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
-    // Null-terminate plaintext?
+    // Null-terminate plaintext
     decrypt_buffer[322] = 0;
-    printf("PLAINTEXT: %s\n", decrypt.plaintext);
-    printf("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
-    printf("PLAINTEXT HEX:\n");
+
+    // For comparison with plaintext hex data on server side
+    PRINTF("PLAINTEXT: %s\n", decrypt.plaintext);
+    PRINTF("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
+    PRINTF("PLAINTEXT HEX:\n");
     PRINTF_HEX(decrypt.plaintext, decrypt.plaintext_len);
-    printf("\n");
+    PRINTF("\n");
 
     // Declare and structure manifest for parsing
     manifest_t manifest;
@@ -279,59 +289,41 @@ PROCESS_THREAD(update_client, ev, data) {
     manifest_parser(&manifest, (char *)decrypt.plaintext);
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
-    printf("Accept: %d\n", accept);
+    PRINTF("Accept: %d\n", accept);
     
     if(accept) {
         printf("Manifest accepted.\n");
+        // Initialize global has context before updating it in callback function
         dtls_sha256_init(&ctx);
         // Get image from server
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
+        // Image endpoint is not well known, use URL specified in manifest
         coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
         //coap_set_header_uri_path(request, "update/image");
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
-        // TODO: Decode and decrypt image
-        
-        
-
-        //printf("image buffer: %s\n", image_buffer);
-        //printf("image buffer length: %d\n", strlen(image_buffer));
+        printf("Image data received.\n");
 
         int fd = cfs_open("image", CFS_READ);
         int length = cfs_seek(fd, 0, CFS_SEEK_END);
-        // TODO: Might have to null-terminate it myself? It appends some garbage (8z) when
-        // printing
         char output[length + 1];
         cfs_seek(fd, 0, CFS_SEEK_SET);
         cfs_read(fd, output, length);
         cfs_close(fd);
+        // Properly null terminate
         output[length] = '\0';
 
-        printf("output: \n");
-        printf("%s\n", output);
-        printf("output strlen: %d\n", strlen(output));
+        PRINTF("output: \n");
+        PRINTF("%s\n", output);
+        PRINTF("output strlen: %d\n", strlen(output));
         
         
 	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
-        /*for(int i = 0; i < 29; i++) {
-            dtls_sha256_update(&ctx, (uint8_t *)image_buffer + i * 24, 24);
-            printf("ctx buffer: %s\n", ctx.buffer);
-        }
-        dtls_sha256_update(&ctx, (uint8_t *)image_buffer + 696, 8);
-        printf("ctx buffer: %s\n", ctx.buffer);*/
+        // Calculate checksum
 	    dtls_sha256_final(chksum, &ctx);
-        printf("digest comparison: %d\n", strcmp(manifest.payloadInfo->URLDigest->digest, (char *)chksum));
-
-        // TODO: One is represented in hex, the other decimal, make them compatible
-        //printf("DTLS_SHA256_DIGEST_LENGTH: %d\n", DTLS_SHA256_DIGEST_LENGTH);
 	    printf("CHKSUM: ");
 	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
-        printf("\n digest: ");
+        printf("\nDIGEST: ");
         printf_hex((uint8_t *)manifest.payloadInfo->URLDigest->digest, DTLS_SHA256_DIGEST_LENGTH);
-        
-        for(int i = 0; i < 32; i++) {
-            printf("%c -> %ld", chksum[i], strtol((char *)&chksum[i], NULL, 16));
-        }
-	    //printf_char(chksum, DTLS_SHA256_DIGEST_LENGTH);
     } else {
         printf("Mismatched manifest.\n");
     }
@@ -342,29 +334,25 @@ PROCESS_THREAD(update_client, ev, data) {
 }
 
 void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
-    //printf("Parsing at %p: %s\n", manifest_string, manifest_string);
     char *cur_pos = manifest_string;
     int key;
     char *val;
+
     // Traverse the manifest
     while(*cur_pos != '\0') {
         key = get_next_key(&cur_pos);
-        printf("KEY: %d\n", key);
         switch(key) {
             case 0:
                 // VERSION ID
                 val = get_next_value(&cur_pos);
                 manifest_p->versionID = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
                 break;
             case 1:
                 // SEQUENCE NUMBER
                 val = get_next_value(&cur_pos);
-                printf("SEQUENCE NUMBER: %s\n", val);
                 manifest_p->sequenceNumber = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
                 break;
             case 2:
                 // PRECONDITIONS
@@ -373,44 +361,34 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->type = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->value = val;
                 memb_free(&manifestValue, val);
-                ////free(val);
 
                 // Second pair (class id)
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->next->type = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->next->value = val;
                 memb_free(&manifestValue, val);
-                ////free(val);
-
-                //preConditions.next = &nextPreCondition;
-                //manifest_p->preConditions = &preConditions;
                 break;
             case 3:
                 // POSTCONDITIONS
                 val = get_next_value(&cur_pos);
-                //free(val);
                 manifest_p->postConditions->type = -1;
                 manifest_p->postConditions->value = NULL;
                 manifest_p->postConditions->next = NULL;
                 memb_free(&manifestValue, val);
-                //manifest_p->postConditions = &postConditions;
                 break;
             case 4:
                 // CONTENT KEY METHOD
                 val = get_next_value(&cur_pos);
                 manifest_p->contentKeyMethod = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
                 break;
             case 5:
                 // PAYLOAD INFO
@@ -419,21 +397,18 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->format = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
 
                 // Size
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->size = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
 
                 // Storage
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->storage = atoi(val);
                 memb_free(&manifestValue, val);
-                //free(val);
 
                 // Start of URLDigest, skip its key
                 get_next_key(&cur_pos);
@@ -442,59 +417,47 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->URLDigest->URL = val;
                 memb_free(&manifestValue, val);
-                ////free(val);
 
-                // digest
+                // DIGEST
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->URLDigest->digest = val;
                 memb_free(&manifestValue, val);
-                ////free(val);
 
                 manifest_p->payloadInfo->URLDigest->next = NULL;
-                //payloadInfo.URLDigest = &URLDigest;
-                //manifest_p->payloadInfo = &payloadInfo;
                 break;
             case 6:
                 // PRECURSORS
                 val = get_next_value(&cur_pos);
-                //free(val);
                 manifest_p->precursorImage->URL = NULL;
                 manifest_p->precursorImage->digest = NULL;
                 manifest_p->precursorImage->next = NULL;
                 memb_free(&manifestValue, val);
-                //manifest_p->precursorImage = &precursorImage;
                 break;
             case 7:
                 // DEPENDENCIES
                 val = get_next_value(&cur_pos);
-                //free(val);
                 manifest_p->dependencies->URL = NULL;
                 manifest_p->dependencies->digest = NULL;
                 manifest_p->dependencies->next = NULL;
                 memb_free(&manifestValue, val);
-                //manifest_p->dependencies = &dependencies;
                 break;
             case 8:
                 // OPTIONS
                 val = get_next_value(&cur_pos);
-                //free(val);
                 manifest_p->options->type = -1;
                 manifest_p->options->value = NULL;
                 manifest_p->options->next = NULL;
                 memb_free(&manifestValue, val);
-                //manifest_p->options = &options;
                 break;
         }     
     
     }
 }
 
-
 int get_next_key(char **buffer) {
     char check; // Will hold the candidate for the key value
-    //printf("Current char: %d\n", **buffer);
-    //printf("BUFFER: %s\n", *buffer);
+
     while(**buffer > 0) {
         check = (*buffer)[1];
         // Check for the pattern "X" where X is a digit
@@ -506,7 +469,6 @@ int get_next_key(char **buffer) {
             (*buffer)++;
         }
     }
-    printf("BUFFER == '\\0'\n");
     return -1;
 }
 
@@ -543,21 +505,7 @@ char *get_next_value(char **buffer) {
     return ret;
 }
 
-
 int is_digit(char *c) {
-    /*printf("IS DIGIT CHECKING %c at %p, ", *c, c);
-    while(c != NULL) {
-        printf("*c: %c\n", *c);
-        printf("Trying *c < '0': %d\n", *c < '0');
-        printf("Trying *c > '9': %d\n", *c > '9');
-        if(*c < '0' || *c > '9') {
-            printf(" OUTCOME NO\n");
-            return 0;
-        }
-        //c++;
-    }
-    printf(" OUTCOME YES\n");
-    return 1;*/
     if(*c < '0' || *c > '9') {
         return 0;
     } else {
@@ -565,37 +513,16 @@ int is_digit(char *c) {
     }
 }
 
-
 void print_manifest(manifest_t *manifest) {
-    printf("MANIFEST: %s\n", manifest_buffer);
-    printf("MANIFEST LENGTH: %d\n", strlen(manifest_buffer));
-    printf("VERSION: %d\n", manifest->versionID);
-    printf("SEQUENCE: %d\n", manifest->sequenceNumber);
-    printf("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
-    printf("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
-    printf("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
-    printf("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
-    printf("FORMAT: %d SIZE: %d STORAGE: %d\n", manifest->payloadInfo->format, manifest->payloadInfo->size, manifest->payloadInfo->storage);
-    printf("URL: %s DIGEST: %s\n", manifest->payloadInfo->URLDigest->URL, manifest->payloadInfo->URLDigest->digest);
-    printf("PRECURSORS: %s %s\n", manifest->precursorImage->URL, manifest->precursorImage->digest);
-    printf("DEPENDENCIES: %s %s\n", manifest->dependencies->URL, manifest->dependencies->digest);
-    printf("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
-}
-
-void printf_char(unsigned char *data, unsigned int len){
-	unsigned int i=0;
-	for(i=0; i<len; i++)
-	{
-		printf("%c ",data[i]);
-	}
-	printf("\n");
-}
-
-void printf_hex(unsigned char *data, unsigned int len){
-	unsigned int i=0;
-	for(i=0; i<len; i++)
-	{
-		printf("%02x ",data[i]);
-	}
-	printf("\n");
+    PRINTF("VERSION: %d\n", manifest->versionID);
+    PRINTF("SEQUENCE: %d\n", manifest->sequenceNumber);
+    PRINTF("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
+    PRINTF("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
+    PRINTF("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
+    PRINTF("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
+    PRINTF("FORMAT: %d SIZE: %d STORAGE: %d\n", manifest->payloadInfo->format, manifest->payloadInfo->size, manifest->payloadInfo->storage);
+    PRINTF("URL: %s DIGEST: %s\n", manifest->payloadInfo->URLDigest->URL, manifest->payloadInfo->URLDigest->digest);
+    PRINTF("PRECURSORS: %s %s\n", manifest->precursorImage->URL, manifest->precursorImage->digest);
+    PRINTF("DEPENDENCIES: %s %s\n", manifest->dependencies->URL, manifest->dependencies->digest);
+    PRINTF("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
 }
