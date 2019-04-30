@@ -26,7 +26,7 @@ RESOURCE(res_image,
          NULL,
          NULL);
 
-#define BLOCKS_TOTAL 11
+#define BLOCKS_TOTAL 10
 #define SUITUP_COOJA
 
 #define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
@@ -57,16 +57,15 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   char *aad = "0011bbcc22dd44ee55ff660077";
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	// Hard coded nonce for example
   uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  int32_t strpos = 0;
-  static int block = 0;
+  static int block = 1;
   
   //printf("OFFSET: %d\n", *offset);
-  if(*offset >= BLOCKS_TOTAL * 32) {
+  /*if(*offset >= BLOCKS_TOTAL * 32) {
     coap_set_status_code(response, BAD_OPTION_4_02);
     const char *error_msg = "BlockOutOfScope";
     coap_set_payload(response, error_msg, strlen(error_msg));
     return;
-  }
+  }*/
 
   //printf("OFFSET: %ld\n", *offset);
   //int length = strlen(message) - *offset < preferred_size - 8 ? strlen(message) -
@@ -83,7 +82,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   }
   printf("\n");
 
-  uint8_t ciphertext_buffer[length + 8]; // +8 för tag-len
+  uint8_t ciphertext_buffer[length + 8]; // +8 for tag-len
   
   OPT_COSE_Init(&cose);
   OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
@@ -126,11 +125,6 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   printf("\n");
   
   block++;
-  strpos += length + 8;
-  
-  if(strpos > preferred_size) {
-    strpos = preferred_size;
-  }
   
   /*if(*offset + (int32_t)strpos > CHUNKS_TOTAL) {
     printf("*offset + (int32_t)strpos > CHUNKS_TOTAL\n");
@@ -142,7 +136,7 @@ res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *bu
   // Output from COSE encrypt is always 32 bytes long
   coap_set_payload(response, buffer, 32);
   // Update offset for next pass
-  *offset += strpos - 8;
+  *offset += 32;
   //printf("FEOF: %d\n", feof(fd));
   // End block transmission if exceeding some limit or EOF found in manifest file
   if(end){// || feof(fd)) {
