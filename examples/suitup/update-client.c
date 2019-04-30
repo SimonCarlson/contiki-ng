@@ -190,6 +190,8 @@ int manifest_checker(manifest_t *manifest) {
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
     printf("Client starting\n");
+    // Persistance sometimes causes issue for experimental setup
+    cfs_remove("image");
     static struct etimer et;
     static coap_endpoint_t server_ep;
     static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
@@ -221,7 +223,7 @@ PROCESS_THREAD(update_client, ev, data) {
     coap_set_header_uri_query(request, query_data); 
     //printf("URI QUERY: %s, LENGTH: %d\n", request->uri_query, bytes);
     // TODO: On firefly this doesnt seem to work but rather times out
-    //COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
+    COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
     printf("Registration done\n");
 
     // Get manifest from server
@@ -334,8 +336,7 @@ PROCESS_THREAD(update_client, ev, data) {
         printf("Mismatched manifest.\n");
     }
 
-    // Remove file? Persistance causes issue for experimental setup
-    cfs_remove("image");
+    printf("Finished.\n");
 
   PROCESS_END();
 }
