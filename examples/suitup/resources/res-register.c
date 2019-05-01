@@ -64,7 +64,7 @@ res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   version[3] = '\0';
   PRINTF("Version: %s\n", version);
 
-  char profile_data[37 + 37 + 4 + 1];
+  char profile_data[37 + 37 + 4 + 2];
   snprintf(profile_data, sizeof(profile_data), "%s\n%s\n%s\n", vendor_id, class_id, version);
   int fd = cfs_open("profile", CFS_WRITE);
   cfs_write(fd, profile_data, sizeof(profile_data));
