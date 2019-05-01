@@ -29,16 +29,17 @@ static void
 res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   static int transmit = 0;
+  static int end = 0;
+
   static opt_cose_encrypt_t cose;
   // Cannot make it smaller without running into stack smashing. I think having a static
   // COSE object and/or ciphertext buffer causes issues with the stack. Should be 16 long
-  uint8_t data[65] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  uint8_t data[100] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   uint8_t cose_buffer = 0;
-  char *aad = "0011bbcc22dd44ee55ff660077";
+  char *aad = "0011bbcc22dd44ee55ff660077"; // Chosen from RFC 8152
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};
   static uint8_t ciphertext_buffer[330]; // +8 for tag-len
   PRINTF("MANIFEST RESOURCE\n");
-  static int end = 0;
 
   if(!transmit) {
     // If transmission is starting, encrypt entire manifest
