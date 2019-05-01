@@ -1,11 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include "cfs/cfs.h"
 #include "coap-engine.h"
 #include "opt-cose.h"
 
 #define DEBUG 0
 #if DEBUG
-#include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTF_HEX(data, len) 	oscoap_printf_hex(data, len)
 #else
@@ -31,6 +32,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   static int transmit = 0;
   static int end = 0;
 
+
   static opt_cose_encrypt_t cose;
   // Cannot make it smaller without running into stack smashing. I think having a static
   // COSE object and/or ciphertext buffer causes issues with the stack. Should be 16 long
@@ -42,6 +44,14 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   PRINTF("MANIFEST RESOURCE\n");
 
   if(!transmit) {
+    // Here the server would pick a manifest to encrypt and send depending on the
+    // information in the profile
+    char profile_data[37 + 37 + 4 + 2];
+    int fd = cfs_open("profile", CFS_READ);
+    cfs_read(fd, profile_data, sizeof(profile_data));
+    printf("Manifest request from device with profile:\n%s\n", profile_data);
+    cfs_close(fd);
+
     // If transmission is starting, encrypt entire manifest
     PRINTF("Manifest: %s\n", manifest);
 	  OPT_COSE_Init(&cose);
