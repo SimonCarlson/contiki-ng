@@ -54,6 +54,10 @@ AUTOSTART_PROCESSES(&hello_world_process);
 
 void hello_callback(coap_message_t *response) {
     printf("REGISTER CALLBACK\n");
+    const uint8_t *chunk;
+
+    coap_get_payload(response, &chunk);
+    printf("Got: %s\n", (char *)chunk);
 }
 
 PROCESS_THREAD(hello_world_process, ev, data)
@@ -76,8 +80,8 @@ PROCESS_THREAD(hello_world_process, ev, data)
   }
   printf("CLIENT CONNECTED? : %d\n", coap_endpoint_is_connected(&server_ep));
 
-  coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
-  coap_set_header_uri_path(request, "test/hello");
+  coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
+  coap_set_header_uri_path(request, "update/image");
   COAP_BLOCKING_REQUEST(&server_ep, request, hello_callback);
 
   PROCESS_END();
