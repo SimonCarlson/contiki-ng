@@ -47,7 +47,6 @@
 #include "coap-keystore-simple.h"
 #include "rpl.h"
 #include "sys/energest.h"
-#include "cfs/cfs.h"    // Coffee filesystem
 #include "manifest-parser.h"
 #include "opt-cose.h"
 #include "os/net/security/tinydtls/tinydtls.h"
@@ -58,14 +57,14 @@
 #define LOG_MODULE "client"
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
-#define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
+#define SERVER_EP "coap://[fd00::1]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
 #define INTERVAL 3
 #define TIMEOUT 1
 
-#define DEBUG 0
+#define DEBUG 1
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTF_HEX(data, len) 	printf_hex(data, len)
@@ -81,7 +80,7 @@ void printf_hex(unsigned char*, unsigned int);
 
 static char manifest_buffer[370];
 static int manifest_offset = 0;
-static int image_offset = 0;
+static int blocks = 0;
 dtls_sha256_ctx ctx;
 
 struct value_t {
@@ -96,17 +95,17 @@ PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
 void printf_char(unsigned char *data, unsigned int len){
-	unsigned int i=0;
-	for(i=0; i<len; i++)
+	unsigned int i;
+	for(i = 0; i < len - 1; i+=2)
 	{
-		printf("%c ",data[i]);
+		printf("%c%c ", data[i], data[i+1]);
 	}
 	printf("\n");
 }
 
 void printf_hex(unsigned char *data, unsigned int len){
-	unsigned int i=0;
-	for(i=0; i<len; i++)
+	unsigned int i;
+	for(i = 0; i < len; i++)
 	{
 		printf("%02x ",data[i]);
 	}
@@ -164,22 +163,15 @@ void image_callback(coap_message_t *response) {
 
     PRINTF("plaintext: ");
     for(int j = 0; j < 24; j++) {
-        PRINTF("%02x ", decrypt.plaintext[j]);
+        PRINTF("%c", decrypt.plaintext[j]);
     }
     PRINTF("\n");
-    PRINTF("plaintext len: %d\n", decrypt.plaintext_len);
-    PRINTF("plaintext strlen: %d\n", strlen((char *)decrypt.plaintext));
     
     // Last block might have less than 24 bytes of data
     int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
-    int fd = cfs_open("image", CFS_WRITE | CFS_APPEND);
-    cfs_write(fd, decrypt.plaintext, length);
-    cfs_close(fd);
-    // Update digest context with plaintext
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
 
-    // Only 24 bytes of data has been written, remaining 8 was tag
-    image_offset += 24;    
+    blocks++;
 }
 
 int manifest_checker(manifest_t *manifest) {
@@ -201,8 +193,6 @@ int manifest_checker(manifest_t *manifest) {
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
     printf("Client started.\n");
-    // Persistance sometimes causes issue for experimental setup
-    cfs_remove("image");
     static struct etimer et;
     static coap_endpoint_t server_ep;
     static coap_message_t request[1];      /* This way the packet can be treated as pointer as usual. */
@@ -302,28 +292,16 @@ PROCESS_THREAD(update_client, ev, data) {
         //coap_set_header_uri_path(request, "update/image");
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         printf("Image data received.\n");
+        printf("%d blocks received during image transfer.\n", blocks);
 
-        int fd = cfs_open("image", CFS_READ);
-        int length = cfs_seek(fd, 0, CFS_SEEK_END);
-        char output[length + 1];
-        cfs_seek(fd, 0, CFS_SEEK_SET);
-        cfs_read(fd, output, length);
-        cfs_close(fd);
-        // Properly null terminate
-        output[length] = '\0';
-
-        PRINTF("output: \n");
-        PRINTF("%s\n", output);
-        PRINTF("output strlen: %d\n", strlen(output));
-        
-        
 	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
         // Calculate checksum
 	    dtls_sha256_final(chksum, &ctx);
-	    printf("CHKSUM: ");
+	    printf("Calculated checksum:\n");
 	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
-        printf("\nDIGEST: ");
-        printf_hex((uint8_t *)manifest.payloadInfo->URLDigest->digest, DTLS_SHA256_DIGEST_LENGTH);
+        //printf("\nChecksum in digest:\n%s\n", manifest.payloadInfo->URLDigest->digest);
+        printf("\nChecksum in manifest:\n");
+        printf_char((uint8_t *)manifest.payloadInfo->URLDigest->digest, 64);
     } else {
         printf("Mismatched manifest.\n");
     }

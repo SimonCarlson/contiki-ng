@@ -30,7 +30,7 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
 {
   PRINTF("IMAGE RESOURCE\n");
   int length = 24;
-  static int block = 1;
+  static int block = 0;
   static int end = 0;
 
   uint8_t data[32];
@@ -43,7 +43,9 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
 
   PRINTF("BLOCK: %d\n", block);
   // Format some data into a buffer
-  snprintf((char*)data, 24, "|%ld||%ld||%ld||%ld||%ld||%ld||%ld||%ld|", *offset, *offset, *offset, *offset, *offset, *offset, *offset, *offset);
+  // Casting it to avoid type error when compiling native vs on firefly
+  int format = (int) *offset;
+  snprintf((char*)data, 24, "|%d||%d||%d||%d||%d||%d||%d||%d|", format, format, format, format, format, format, format, format);
   PRINTF("Data plaintext: ");
   for(int i = 0; i < length; i++) {
     PRINTF("%c", data[i]);
