@@ -57,14 +57,14 @@
 #define LOG_MODULE "client"
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
-#define SERVER_EP "coap://[fd00::1]"
+#define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
 #define INTERVAL 3
 #define TIMEOUT 1
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTF_HEX(data, len) 	printf_hex(data, len)
@@ -172,6 +172,9 @@ void image_callback(coap_message_t *response) {
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
 
     blocks++;
+    if(blocks % 100 == 0) {
+        printf("Block %d\n", blocks);
+    }
 }
 
 int manifest_checker(manifest_t *manifest) {
@@ -236,7 +239,7 @@ PROCESS_THREAD(update_client, ev, data) {
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
 	char *aad2 = "0011bbcc22dd44ee55ff660077";
-	uint8_t decrypt_buffer[323];
+	uint8_t decrypt_buffer[325];
 	uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
@@ -245,16 +248,15 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
 	OPT_COSE_SetNonce(&decrypt, nonce, 7);
 	OPT_COSE_SetAAD(&decrypt, (uint8_t*)aad2, strlen(aad2));
-	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 322);
-	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 330);
+	OPT_COSE_SetContent(&decrypt, decrypt_buffer, 324);
+	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 332);
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
     // Null-terminate plaintext
-    decrypt_buffer[322] = 0;
+    decrypt_buffer[324] = 0;
 
+    printf("PLAINTEXT: %s\n", decrypt.plaintext);
     // For comparison with plaintext hex data on server side
-    PRINTF("PLAINTEXT: %s\n", decrypt.plaintext);
-    PRINTF("PLAINTEXT LENGTH: %d\n", strlen((char *)decrypt.plaintext));
     PRINTF("PLAINTEXT HEX:\n");
     PRINTF_HEX(decrypt.plaintext, decrypt.plaintext_len);
     PRINTF("\n");
@@ -289,7 +291,6 @@ PROCESS_THREAD(update_client, ev, data) {
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
         // Image endpoint is not well known, use URL specified in manifest
         coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
-        //coap_set_header_uri_path(request, "update/image");
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
         printf("Image data received.\n");
         printf("%d blocks received during image transfer.\n", blocks);
@@ -299,9 +300,6 @@ PROCESS_THREAD(update_client, ev, data) {
 	    dtls_sha256_final(chksum, &ctx);
 	    printf("Calculated checksum:\n");
 	    printf_hex(chksum, DTLS_SHA256_DIGEST_LENGTH);
-        //printf("\nChecksum in digest:\n%s\n", manifest.payloadInfo->URLDigest->digest);
-        printf("\nChecksum in manifest:\n");
-        printf_char((uint8_t *)manifest.payloadInfo->URLDigest->digest, 64);
     } else {
         printf("Mismatched manifest.\n");
     }
@@ -313,7 +311,7 @@ PROCESS_THREAD(update_client, ev, data) {
 
 void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
     char *cur_pos = manifest_string;
-    int key;
+    uint8_t key;
     char *val;
 
     // Traverse the manifest
@@ -433,7 +431,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
     }
 }
 
-int get_next_key(char **buffer) {
+uint8_t get_next_key(char **buffer) {
     char check; // Will hold the candidate for the key value
 
     while(**buffer > 0) {
@@ -483,7 +481,7 @@ char *get_next_value(char **buffer) {
     return ret;
 }
 
-int is_digit(char *c) {
+uint8_t is_digit(char *c) {
     if(*c < '0' || *c > '9') {
         return 0;
     } else {
@@ -493,12 +491,12 @@ int is_digit(char *c) {
 
 void print_manifest(manifest_t *manifest) {
     PRINTF("VERSION: %d\n", manifest->versionID);
-    PRINTF("SEQUENCE: %d\n", manifest->sequenceNumber);
+    PRINTF("SEQUENCE: %ld\n", manifest->sequenceNumber);
     PRINTF("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
     PRINTF("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
     PRINTF("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
     PRINTF("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
-    PRINTF("FORMAT: %d SIZE: %d STORAGE: %d\n", manifest->payloadInfo->format, manifest->payloadInfo->size, manifest->payloadInfo->storage);
+    PRINTF("FORMAT: %d SIZE: %ld STORAGE: %d\n", manifest->payloadInfo->format, manifest->payloadInfo->size, manifest->payloadInfo->storage);
     PRINTF("URL: %s DIGEST: %s\n", manifest->payloadInfo->URLDigest->URL, manifest->payloadInfo->URLDigest->digest);
     PRINTF("PRECURSORS: %s %s\n", manifest->precursorImage->URL, manifest->precursorImage->digest);
     PRINTF("DEPENDENCIES: %s %s\n", manifest->dependencies->URL, manifest->dependencies->digest);
