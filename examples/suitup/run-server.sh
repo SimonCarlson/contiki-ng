@@ -1,1 +1,1 @@
-make MAKE_WITH_DTLS=1 TARGET=zoul BOARD=firefly PORT=/dev/ttyUSB0 update-server.upload && make TARGET=zoul BOARD=firefly PORT=/dev/ttyUSB0 login
+make MAKE_WITH_DTLS=1 MAKE_COAP_DTLS_KEYSTORE=MAKE_COAP_DTLS_KEYSTORE_SIMPLE TARGET=zoul BOARD=firefly PORT=/dev/ttyUSB0 update-server.upload && make MAKE_WITH_DTLS=1 MAKE_COAP_DTLS_KEYSTORE=MAKE_COAP_DTLS_KEYSTORE_SIMPLE TARGET=zoul BOARD=firefly PORT=/dev/ttyUSB0 login

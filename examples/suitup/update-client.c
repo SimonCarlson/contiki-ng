@@ -56,7 +56,7 @@
 #define LOG_MODULE "client"
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
-#define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
+#define SERVER_EP "coaps://[fd00::212:4b00:9df:9096]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
@@ -210,7 +210,7 @@ PROCESS_THREAD(update_client, ev, data) {
         etimer_set(&et, CLOCK_SECOND * INTERVAL);
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
         printf("Checking connection again.\n");
-        coap_endpoint_connect(&server_ep);
+        //coap_endpoint_connect(&server_ep);
     }
     printf("Client connected.\n");
 
