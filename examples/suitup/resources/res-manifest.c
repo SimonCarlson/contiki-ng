@@ -24,7 +24,8 @@ RESOURCE(res_manifest,
          NULL,
          NULL);
   
-static char *manifest= "{\"0\": 1, \"1\": 1555415686, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3, \"1\": 704, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"8c2859fca075e24d1a79d0b6cdfdfe5c07da8c203a892700538efd96f789b355\"}]}, \"6\": [], \"7\": [], \"8\": []}";
+//static char *manifest= "{\"0\": 1, \"1\": 1555415686, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3, \"1\": 704, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"8c2859fca075e24d1a79d0b6cdfdfe5c07da8c203a892700538efd96f789b355\"}]}, \"6\": [], \"7\": [], \"8\": []}";
+static char *manifest = "{\"0\": 1, \"1\": 1556783337, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3, \"1\": 11500, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"37ce827871e6c63e9e5aab92f84c579f7aa5c6be0c3980cb6e30a102396abfd6\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 
 static void
 res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
@@ -40,7 +41,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   uint8_t cose_buffer = 0;
   char *aad = "0011bbcc22dd44ee55ff660077"; // Chosen from RFC 8152
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};
-  static uint8_t ciphertext_buffer[330]; // +8 for tag-len
+  static uint8_t ciphertext_buffer[332]; // +8 for tag-len
   PRINTF("MANIFEST RESOURCE\n");
 
   if(!transmit) {
@@ -57,14 +58,14 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
 	  OPT_COSE_Init(&cose);
 	  OPT_COSE_SetAlg(&cose, COSE_Algorithm_AES_CCM_64_64_128);
 	  OPT_COSE_SetNonce(&cose, nonce, 7);
-	  OPT_COSE_SetContent(&cose, (uint8_t *)manifest, 322);
-	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, 330);
+	  OPT_COSE_SetContent(&cose, (uint8_t *)manifest, 324);
+	  OPT_COSE_SetCiphertextBuffer(&cose, ciphertext_buffer, 332);
 	  OPT_COSE_SetAAD(&cose, (uint8_t *)aad, strlen(aad));
 	  OPT_COSE_Encrypt(&cose, data, 16);
 	  OPT_COSE_Encode(&cose, &cose_buffer);
 
     PRINTF("Ciphertext manifest: \n");
-    PRINTF_HEX(ciphertext_buffer, 330);
+    PRINTF_HEX(ciphertext_buffer, 332);
     PRINTF("\n");
     transmit = 1;
   }
