@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "coap-engine.h"
 #include "opt-cose.h"
+#include "sys/energest.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -23,15 +24,25 @@ RESOURCE(res_image,
          NULL,
          NULL);
 
-#define BLOCKS_TOTAL 500 // Each block is 32 bytes total, of which 24 is data, with one byte for null-termination
+#define BLOCKS_TOTAL 2000 // Each block is 32 bytes total, of which 24 is data, with one byte for null-termination
 #define SUITUP_COOJA
 
 static void res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("IMAGE RESOURCE\n");
+  static uint64_t cpu_start, cpu_time, lpm_start, lpm_time, dlpm_start, dlpm_time, tx_start, tx_time, rx_start, rx_time;
   int length = 24;
   static int block = 1;
   static int end = 0;
+
+  if(block == 1) {
+    energest_flush();
+    cpu_start = energest_type_time(ENERGEST_TYPE_CPU);
+    lpm_start = energest_type_time(ENERGEST_TYPE_LPM);
+    dlpm_start = energest_type_time(ENERGEST_TYPE_DEEP_LPM);
+    tx_start = energest_type_time(ENERGEST_TYPE_TRANSMIT);
+    rx_start = energest_type_time(ENERGEST_TYPE_LISTEN);
+  }
 
   uint8_t data[32];
   opt_cose_encrypt_t cose;
@@ -85,6 +96,14 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
   *offset += 32;
   // End of block transfer
   if(end){
+    energest_flush();
+    cpu_time = energest_type_time(ENERGEST_TYPE_CPU) - cpu_start;
+    lpm_time = energest_type_time(ENERGEST_TYPE_LPM) - lpm_start;
+    dlpm_time = energest_type_time(ENERGEST_TYPE_DEEP_LPM) - dlpm_start;
+    tx_time = energest_type_time(ENERGEST_TYPE_TRANSMIT) - tx_start;
+    rx_time = energest_type_time(ENERGEST_TYPE_LISTEN) - rx_start;
+    printf("Image: CPU: %llus LPM: %llus DLPM: %llus TX: %llus RX: %llus\n", cpu_time, lpm_time, dlpm_time, tx_time, rx_time);
+
     PRINTF("END\n");
     *offset = -1;
     end = 0;
