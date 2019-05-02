@@ -1,4 +1,4 @@
-all: update-server update-client
+all: update-server update-client bare-bones
 # use target "plugtest-server" explicitly when required
 
 CONTIKI=../..
@@ -14,6 +14,8 @@ MODULES_REL += $(TARGET)
 # Include the CoAP implementation
 MODULES += os/net/app-layer/coap os/services/shell
 PROJECT_SOURCEFILES += opt-cose.c opt-cbor.c cose-aes-ccm.c
+MAKE_WITH_DTLS=1
+MAKE_COAP_DTLS_KEYSTORE=MAKE_COAP_DTLS_KEYSTORE_SIMPLE
 include $(CONTIKI)/Makefile.include
 
 # border router rules
