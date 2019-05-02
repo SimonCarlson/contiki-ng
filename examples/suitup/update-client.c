@@ -45,7 +45,6 @@
 #include "coap-engine.h"
 #include "coap-blocking-api.h"
 #include "coap-keystore-simple.h"
-#include "rpl.h"
 #include "sys/energest.h"
 #include "manifest-parser.h"
 #include "opt-cose.h"
