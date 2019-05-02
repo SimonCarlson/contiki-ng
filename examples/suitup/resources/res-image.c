@@ -23,14 +23,14 @@ RESOURCE(res_image,
          NULL,
          NULL);
 
-#define BLOCKS_TOTAL 10 // Each block is 32 bytes total, of which 24 is data, with one byte for null-termination
+#define BLOCKS_TOTAL 500 // Each block is 32 bytes total, of which 24 is data, with one byte for null-termination
 #define SUITUP_COOJA
 
 static void res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("IMAGE RESOURCE\n");
   int length = 24;
-  static int block = 0;
+  static int block = 1;
   static int end = 0;
 
   uint8_t data[32];
@@ -88,6 +88,6 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
     PRINTF("END\n");
     *offset = -1;
     end = 0;
-    block = 0;
+    block = 1;
   }
 }
