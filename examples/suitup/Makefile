@@ -12,7 +12,7 @@ MODULES_REL += ./resources
 MODULES_REL += $(TARGET)
 
 # Include the CoAP implementation
-MODULES += os/net/app-layer/coap os/services/shell
+MODULES += os/net/app-layer/coap
 PROJECT_SOURCEFILES += opt-cose.c opt-cbor.c cose-aes-ccm.c
 MAKE_WITH_DTLS=1
 MAKE_COAP_DTLS_KEYSTORE=MAKE_COAP_DTLS_KEYSTORE_SIMPLE

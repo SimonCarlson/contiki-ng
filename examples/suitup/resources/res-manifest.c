@@ -4,7 +4,6 @@
 #include "cfs/cfs.h"
 #include "coap-engine.h"
 #include "opt-cose.h"
-#include "sys/energest.h"
 
 #define DEBUG 0
 #if DEBUG
@@ -34,7 +33,6 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   static int transmit = 0;
   static int end = 0;
 
-  static uint64_t cpu_start, cpu_time, lpm_start, lpm_time, dlpm_start, dlpm_time, tx_start, tx_time, rx_start, rx_time;
   static opt_cose_encrypt_t cose;
   // Cannot make it smaller without running into stack smashing. I think having a static
   // COSE object and/or ciphertext buffer causes issues with the stack. Should be 16 long
@@ -46,13 +44,6 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   PRINTF("MANIFEST RESOURCE\n");
 
   if(!transmit) {
-    energest_flush();
-    cpu_start = energest_type_time(ENERGEST_TYPE_CPU);
-    lpm_start = energest_type_time(ENERGEST_TYPE_LPM);
-    dlpm_start = energest_type_time(ENERGEST_TYPE_DEEP_LPM);
-    tx_start = energest_type_time(ENERGEST_TYPE_TRANSMIT);
-    rx_start = energest_type_time(ENERGEST_TYPE_LISTEN);
-
     // Here the server would pick a manifest to encrypt and send depending on the
     // information in the profile
     char profile_data[37 + 37 + 4 + 2];
@@ -98,13 +89,6 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   *offset += preferred_size;
   // End of block transfer
   if(end == 1){
-    energest_flush();
-    cpu_time = energest_type_time(ENERGEST_TYPE_CPU) - cpu_start;
-    lpm_time = energest_type_time(ENERGEST_TYPE_LPM) - lpm_start;
-    dlpm_time = energest_type_time(ENERGEST_TYPE_DEEP_LPM) - dlpm_start;
-    tx_time = energest_type_time(ENERGEST_TYPE_TRANSMIT) - tx_start;
-    rx_time = energest_type_time(ENERGEST_TYPE_LISTEN) - rx_start;
-    printf("Manifest: CPU: %llus LPM: %llus DLPM: %llus TX: %llus RX: %llus\n", cpu_time, lpm_time, dlpm_time, tx_time, rx_time);
     *offset = -1;
     end = 0;
     transmit = 0;

@@ -45,7 +45,6 @@
 #include "coap-engine.h"
 #include "coap-blocking-api.h"
 #include "coap-keystore-simple.h"
-#include "sys/energest.h"
 #include "manifest-parser.h"
 #include "opt-cose.h"
 #include "os/net/security/tinydtls/tinydtls.h"
@@ -61,39 +60,39 @@
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
 #define INTERVAL 3
-#define TIMEOUT 1
 
 #define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTF_HEX(data, len) 	printf_hex(data, len)
 #define PRINTF_CHAR(data, len) printf_char(data, len)
+static int blocks = 0;
 #else
 #define PRINTF(...)
 #define PRINTF_HEX(data, len)
 #define PRINTF_CHAR(data, len)
 #endif
 
+#if DEBUG
 void printf_char(unsigned char*, unsigned int);
+#endif
 void printf_hex(unsigned char*, unsigned int);
 
 static char manifest_buffer[370];
 static int manifest_offset = 0;
-static int blocks = 0;
 dtls_sha256_ctx ctx;
-static uint64_t cpu_start, cpu_time, lpm_start, lpm_time, dlpm_start, dlpm_time, tx_start, tx_time, rx_start, rx_time;
 
 struct value_t {
     char value[256];        // Digest is SHA-256, needs to fit
 };
 
-// TODO: Why does it not work with blocks = 1 and freeing the memory?
 #define BLOCKS 6
 MEMB(manifestValue, struct value_t, BLOCKS);
 
 PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
+#if DEBUG
 void printf_char(unsigned char *data, unsigned int len){
 	unsigned int i;
 	for(i = 0; i < len - 1; i+=2)
@@ -102,6 +101,7 @@ void printf_char(unsigned char *data, unsigned int len){
 	}
 	printf("\n");
 }
+#endif
 
 void printf_hex(unsigned char *data, unsigned int len){
 	unsigned int i;
@@ -170,11 +170,13 @@ void image_callback(coap_message_t *response) {
     // Last block might have less than 24 bytes of data
     int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
-
+    #if DEBUG
     blocks++;
     if(blocks % 100 == 0) {
-        printf("Block %d\n", blocks);
+        PRINTF("Block %d\n", blocks);
     }
+    #endif // DEBUG
+
 }
 
 int manifest_checker(manifest_t *manifest) {
@@ -193,24 +195,6 @@ int manifest_checker(manifest_t *manifest) {
     return 1;
 }
 
-void energest_start() {
-    energest_flush();
-    cpu_start = energest_type_time(ENERGEST_TYPE_CPU);
-    lpm_start = energest_type_time(ENERGEST_TYPE_LPM);
-    dlpm_start = energest_type_time(ENERGEST_TYPE_DEEP_LPM);
-    tx_start = energest_type_time(ENERGEST_TYPE_TRANSMIT);
-    rx_start = energest_type_time(ENERGEST_TYPE_LISTEN);
-}
-
-void energest_end(char *section) {
-    energest_flush();
-    cpu_time = energest_type_time(ENERGEST_TYPE_CPU) - cpu_start;
-    lpm_time = energest_type_time(ENERGEST_TYPE_LPM) - lpm_start;
-    dlpm_time = energest_type_time(ENERGEST_TYPE_DEEP_LPM) - dlpm_start;
-    tx_time = energest_type_time(ENERGEST_TYPE_TRANSMIT) - tx_start;
-    rx_time = energest_type_time(ENERGEST_TYPE_LISTEN) - rx_start;
-    printf("%s: CPU: %llus LPM: %llus DLPM: %llus TX: %llus RX: %llus\n", section, cpu_time, lpm_time, dlpm_time, tx_time, rx_time);
-}
 
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
@@ -241,19 +225,15 @@ PROCESS_THREAD(update_client, ev, data) {
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     coap_set_header_uri_query(request, query_data); 
 
-    energest_start();
     // Register to server
     COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
-    energest_end("Registration");
     printf("Registration done.\n");
 
     // Get manifest from well known endpoint update/manifest
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
     
-    energest_start();
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
-    energest_end("Manifest");
     printf("Manifest received.\n");
 
     // For comparison with ciphertext hex data on server side
@@ -269,7 +249,6 @@ PROCESS_THREAD(update_client, ev, data) {
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
     
-    energest_start();
 	OPT_COSE_Init(&decrypt);
 	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
 	OPT_COSE_SetNonce(&decrypt, nonce, 7);
@@ -305,7 +284,6 @@ PROCESS_THREAD(update_client, ev, data) {
 
     // Parse and check manifest
     manifest_parser(&manifest, (char *)decrypt.plaintext);
-    energest_end("Manifest decode and parse");
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
     PRINTF("Accept: %d\n", accept);
@@ -318,11 +296,9 @@ PROCESS_THREAD(update_client, ev, data) {
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
         // Image endpoint is not well known, use URL specified in manifest
         coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
-        energest_start();
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
-        energest_end("Image");
         printf("Image data received.\n");
-        printf("%d blocks received during image transfer.\n", blocks);
+        PRINTF("%d blocks received during image transfer.\n", blocks);
 
 	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
         // Calculate checksum
