@@ -47,10 +47,10 @@
 /* #define UIP_CONF_BUFFER_SIZE         256 */
 
 /* Increase rpl-border-router IP-buffer when using more than 64. */
-#define COAP_MAX_CHUNK_SIZE           48
+#define COAP_MAX_CHUNK_SIZE           32
 
 /* Estimate your header size, especially when using Proxy-Uri. */
-#define COAP_MAX_HEADER_SIZE          128
+#define COAP_MAX_HEADER_SIZE          70
 
 /* Multiplies with chunk size, be aware of memory constraints. */
 #ifndef COAP_MAX_OPEN_TRANSACTIONS
@@ -75,12 +75,14 @@
 //#define LOG_CONF_LEVEL_COAP LOG_LEVEL_DBG
 #define LOG_CONF_LEVEL_MAIN LOG_LEVEL_NONE
 #define QUEUEBUF_CONF_NUM 3
-#define NBR_TABLE_CONF_MAX_NEIGHBORS 2
-#define NETSTACK_MAX_ROUTE_ENTIRES 2
-#define SICSLOWPAN_CONF_FRAG 1
-#define UIP_CONF_BUFFER_SIZE 280
+#define NBR_TABLE_CONF_MAX_NEIGHBORS 1
+#define NETSTACK_MAX_ROUTE_ENTIRES 1
+#define SICSLOWPAN_CONF_FRAG 0
+#define UIP_CONF_BUFFER_SIZE 256
 
 #define LOG_CONF_LEVEL_COAP LOG_LEVEL_NONE
 
-#define ENERGEST_CONF_ON 0
+#define HEAPMEM_CONF_ARENA_SIZE 700
+
+#define ENERGEST_CONF_ON 1
 #endif /* IOT_UPDATES_PROJECT_CONF */

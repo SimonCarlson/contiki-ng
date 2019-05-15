@@ -45,54 +45,55 @@
 #include "coap-engine.h"
 #include "coap-blocking-api.h"
 #include "coap-keystore-simple.h"
+#include "sys/energest.h"
 #include "manifest-parser.h"
 #include "opt-cose.h"
 #include "os/net/security/tinydtls/tinydtls.h"
 #include "os/net/security/tinydtls/sha2/sha2.h"
+#include "os/lib/heapmem.h"
+#include "cfs/cfs.h"
 
 /* Log configuration */
 #include "coap-log.h"
 #define LOG_MODULE "client"
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
-#define SERVER_EP "coaps://[fd00::212:4b00:9df:9096]"
+#define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
 #define CLASS_ID "18ce9adf-9d2e-57a3-9374-076282f3d95b"
 #define VERSION "1.0"
 #define INTERVAL 3
+#define TIMEOUT 1
 
 #define DEBUG 0
 #if DEBUG
 #define PRINTF(...) printf(__VA_ARGS__)
 #define PRINTF_HEX(data, len) 	printf_hex(data, len)
 #define PRINTF_CHAR(data, len) printf_char(data, len)
-static int blocks = 0;
 #else
 #define PRINTF(...)
 #define PRINTF_HEX(data, len)
 #define PRINTF_CHAR(data, len)
 #endif
 
-#if DEBUG
 void printf_char(unsigned char*, unsigned int);
-#endif
 void printf_hex(unsigned char*, unsigned int);
 
-static char manifest_buffer[370];
-static int manifest_offset = 0;
+static int blocks = 0;
 dtls_sha256_ctx ctx;
 
-struct value_t {
-    char value[256];        // Digest is SHA-256, needs to fit
-};
 
-#define BLOCKS 6
-MEMB(manifestValue, struct value_t, BLOCKS);
+//struct value_t {
+//    char value[256];        // Digest is SHA-256, needs to fit
+//};
+
+// TODO: Why does it not work with blocks = 1 and freeing the memory?
+//#define BLOCKS 6
+//MEMB(manifestValue, struct value_t, BLOCKS);
 
 PROCESS(update_client, "Update client");
 AUTOSTART_PROCESSES(&update_client);
 
-#if DEBUG
 void printf_char(unsigned char *data, unsigned int len){
 	unsigned int i;
 	for(i = 0; i < len - 1; i+=2)
@@ -101,7 +102,6 @@ void printf_char(unsigned char *data, unsigned int len){
 	}
 	printf("\n");
 }
-#endif
 
 void printf_hex(unsigned char *data, unsigned int len){
 	unsigned int i;
@@ -127,8 +127,11 @@ void manifest_callback(coap_message_t *response) {
     }
     PRINTF("\n");
     // Reassemble the received ciphertext into a buffer
-    memcpy(manifest_buffer + manifest_offset, (char *)chunk, 32);
-    manifest_offset += 32;
+    //memcpy(manifest_buffer + manifest_offset, (char *)chunk, 32);
+    int fd = cfs_open("manifest", CFS_WRITE | CFS_APPEND);
+    cfs_write(fd, chunk, 32);
+    cfs_seek(fd, 0, CFS_SEEK_SET);
+    cfs_close(fd);
 }
 
 void image_callback(coap_message_t *response) {
@@ -170,13 +173,11 @@ void image_callback(coap_message_t *response) {
     // Last block might have less than 24 bytes of data
     int length = strlen((char *)decrypt.plaintext) < 24 ? strlen((char *)decrypt.plaintext) : 24;
     dtls_sha256_update(&ctx, decrypt.plaintext, length);
-    #if DEBUG
+
     blocks++;
     if(blocks % 100 == 0) {
-        PRINTF("Block %d\n", blocks);
+        printf("Block %d\n", blocks);
     }
-    #endif // DEBUG
-
 }
 
 int manifest_checker(manifest_t *manifest) {
@@ -195,9 +196,29 @@ int manifest_checker(manifest_t *manifest) {
     return 1;
 }
 
+/*void energest_start() {
+    energest_flush();
+    cpu_start = energest_type_time(ENERGEST_TYPE_CPU);
+    lpm_start = energest_type_time(ENERGEST_TYPE_LPM);
+    dlpm_start = energest_type_time(ENERGEST_TYPE_DEEP_LPM);
+    tx_start = energest_type_time(ENERGEST_TYPE_TRANSMIT);
+    rx_start = energest_type_time(ENERGEST_TYPE_LISTEN);
+}
+
+void energest_end(char *section) {
+    energest_flush();
+    cpu_time = energest_type_time(ENERGEST_TYPE_CPU) - cpu_start;
+    lpm_time = energest_type_time(ENERGEST_TYPE_LPM) - lpm_start;
+    dlpm_time = energest_type_time(ENERGEST_TYPE_DEEP_LPM) - dlpm_start;
+    tx_time = energest_type_time(ENERGEST_TYPE_TRANSMIT) - tx_start;
+    rx_time = energest_type_time(ENERGEST_TYPE_LISTEN) - rx_start;
+    printf("%s: CPU: %llus LPM: %llus DLPM: %llus TX: %llus RX: %llus\n", section, cpu_time, lpm_time, dlpm_time, tx_time, rx_time);
+}*/
 
 PROCESS_THREAD(update_client, ev, data) {
     PROCESS_BEGIN();
+    //static uint64_t cpu_start, cpu_time, lpm_start, lpm_time, dlpm_start, dlpm_time, tx_start, tx_time, rx_start, rx_time;
+    
     printf("Client started.\n");
     static struct etimer et;
     static coap_endpoint_t server_ep;
@@ -223,23 +244,32 @@ PROCESS_THREAD(update_client, ev, data) {
     coap_set_header_uri_path(request, "update/register");
     // Copy POST data into buffer for server to make profile of
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
-    coap_set_header_uri_query(request, query_data); 
+    coap_set_payload(request, query_data, sizeof(query_data)); 
 
+    //energest_start();
     // Register to server
     COAP_BLOCKING_REQUEST(&server_ep, request, register_callback);
+    //energest_end("Registration");
     printf("Registration done.\n");
 
     // Get manifest from well known endpoint update/manifest
     coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
     coap_set_header_uri_path(request, "update/manifest");
     
+    //energest_start();
     COAP_BLOCKING_REQUEST(&server_ep, request, manifest_callback);
+    //energest_end("Manifest");
     printf("Manifest received.\n");
 
+    int fd = cfs_open("manifest", CFS_READ);
+    //cfs_seek(fd, 0, CFS_SEEK_SET);
+    char manifest_buffer[332];
+    cfs_read(fd, manifest_buffer, 332);
+
     // For comparison with ciphertext hex data on server side
-    PRINTF("Ciphertext manifest: \n");
-    PRINTF_HEX((uint8_t*)manifest_buffer, 330);
-    PRINTF("\n");
+    printf("Ciphertext manifest: \n");
+    printf_hex((uint8_t*)manifest_buffer, 332);
+    printf("\n");
 
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
@@ -249,6 +279,7 @@ PROCESS_THREAD(update_client, ev, data) {
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
     
+    //energest_start();
 	OPT_COSE_Init(&decrypt);
 	OPT_COSE_SetAlg(&decrypt, COSE_Algorithm_AES_CCM_64_64_128);
 	OPT_COSE_SetNonce(&decrypt, nonce, 7);
@@ -284,6 +315,7 @@ PROCESS_THREAD(update_client, ev, data) {
 
     // Parse and check manifest
     manifest_parser(&manifest, (char *)decrypt.plaintext);
+    //energest_end("Manifest decode and parse");
     print_manifest(&manifest);
     int accept = manifest_checker(&manifest);
     PRINTF("Accept: %d\n", accept);
@@ -295,10 +327,13 @@ PROCESS_THREAD(update_client, ev, data) {
         // Get image from server
         coap_init_message(request, COAP_TYPE_CON, COAP_GET, 0);
         // Image endpoint is not well known, use URL specified in manifest
-        coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        //coap_set_header_uri_path(request, manifest.payloadInfo->URLDigest->URL);
+        coap_set_header_uri_path(request, "update/image");
+        //energest_start();
         COAP_BLOCKING_REQUEST(&server_ep, request, image_callback);
+        //energest_end("Image");
         printf("Image data received.\n");
-        PRINTF("%d blocks received during image transfer.\n", blocks);
+        printf("%d blocks received during image transfer.\n", blocks);
 
 	    uint8_t chksum[DTLS_SHA256_DIGEST_LENGTH];
         // Calculate checksum
@@ -327,13 +362,13 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 // VERSION ID
                 val = get_next_value(&cur_pos);
                 manifest_p->versionID = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 1:
                 // SEQUENCE NUMBER
                 val = get_next_value(&cur_pos);
                 manifest_p->sequenceNumber = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 2:
                 // PRECONDITIONS
@@ -341,21 +376,22 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->type = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
-                manifest_p->preConditions->value = val;
-                memb_free(&manifestValue, val);
+                //manifest_p->preConditions->value = val;
+                manifest_p->preConditions->value = VENDOR_ID;
+                heapmem_free(val);
 
                 // Second pair (class id)
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->next->type = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->next->value = val;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 3:
                 // POSTCONDITIONS
@@ -363,13 +399,13 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 manifest_p->postConditions->type = -1;
                 manifest_p->postConditions->value = NULL;
                 manifest_p->postConditions->next = NULL;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 4:
                 // CONTENT KEY METHOD
                 val = get_next_value(&cur_pos);
                 manifest_p->contentKeyMethod = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 5:
                 // PAYLOAD INFO
@@ -377,19 +413,19 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->format = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
 
                 // Size
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->size = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
 
                 // Storage
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->storage = atoi(val);
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
 
                 // Start of URLDigest, skip its key
                 get_next_key(&cur_pos);
@@ -397,13 +433,13 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->URLDigest->URL = val;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
 
                 // DIGEST
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->payloadInfo->URLDigest->digest = val;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
 
                 manifest_p->payloadInfo->URLDigest->next = NULL;
                 break;
@@ -413,7 +449,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 manifest_p->precursorImage->URL = NULL;
                 manifest_p->precursorImage->digest = NULL;
                 manifest_p->precursorImage->next = NULL;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 7:
                 // DEPENDENCIES
@@ -421,7 +457,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 manifest_p->dependencies->URL = NULL;
                 manifest_p->dependencies->digest = NULL;
                 manifest_p->dependencies->next = NULL;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
             case 8:
                 // OPTIONS
@@ -429,7 +465,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
                 manifest_p->options->type = -1;
                 manifest_p->options->value = NULL;
                 manifest_p->options->next = NULL;
-                memb_free(&manifestValue, val);
+                heapmem_free(val);
                 break;
         }     
     
@@ -464,8 +500,7 @@ char *get_next_value(char **buffer) {
     // Distance until end of value (comma separation)
     distance = index - *buffer;
 
-    struct value_t *val = (struct value_t*)memb_alloc(&manifestValue);
-    char *ret = val->value;
+    char *ret = heapmem_alloc(256);
     // Copy the value field
     strncpy(ret, *buffer, distance);
     // Check if there is a citation mark (meaning value is in string format)
@@ -495,15 +530,15 @@ uint8_t is_digit(char *c) {
 }
 
 void print_manifest(manifest_t *manifest) {
-    PRINTF("VERSION: %d\n", manifest->versionID);
-    PRINTF("SEQUENCE: %ld\n", manifest->sequenceNumber);
-    PRINTF("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
-    PRINTF("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
-    PRINTF("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
-    PRINTF("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
-    PRINTF("FORMAT: %d SIZE: %ld STORAGE: %d\n", manifest->payloadInfo->format, manifest->payloadInfo->size, manifest->payloadInfo->storage);
-    PRINTF("URL: %s DIGEST: %s\n", manifest->payloadInfo->URLDigest->URL, manifest->payloadInfo->URLDigest->digest);
-    PRINTF("PRECURSORS: %s %s\n", manifest->precursorImage->URL, manifest->precursorImage->digest);
-    PRINTF("DEPENDENCIES: %s %s\n", manifest->dependencies->URL, manifest->dependencies->digest);
-    PRINTF("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
+    printf("VERSION: %d\n", manifest->versionID);
+    printf("SEQUENCE: %ld\n", manifest->sequenceNumber);
+    printf("PRECOND 1: %d %s\n", manifest->preConditions->type, manifest->preConditions->value);
+    printf("PRECOND 2: %d %s\n", manifest->preConditions->next->type, manifest->preConditions->next->value);
+    printf("POSTCOND: %d %s\n", manifest->postConditions->type, manifest->postConditions->value);
+    printf("CONTENT KEY METHOD: %d\n", manifest->contentKeyMethod);
+    printf("FORMAT: %d SIZE: %ld STORAGE: %d\n", manifest->payloadInfo->format, manifest->payloadInfo->size, manifest->payloadInfo->storage);
+    printf("URL: %s DIGEST: %s\n", manifest->payloadInfo->URLDigest->URL, manifest->payloadInfo->URLDigest->digest);
+    printf("PRECURSORS: %s %s\n", manifest->precursorImage->URL, manifest->precursorImage->digest);
+    printf("DEPENDENCIES: %s %s\n", manifest->dependencies->URL, manifest->dependencies->digest);
+    printf("OPTIONS: %d %s\n", manifest->options->type, manifest->options->value);
 }
