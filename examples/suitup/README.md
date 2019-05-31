@@ -1,83 +1,35 @@
-A Quick Introduction to the Erbium (Er) CoAP Engine
-===================================================
+# "An Internet of Things Software and Firmware Update Architecture Based on the SUIT Specification" project directory
 
-EXAMPLE FILES
--------------
+## Files
 
-- coap-example-server.c: A CoAP server example showing how to use the CoAP
-  layer to develop server-side applications.
-- coap-example-client.c: A CoAP client that polls the /actuators/toggle resource
-  every 10 seconds and cycles through 4 resources on button press (target
-  address is hard-coded).
-- plugtest-server.c: The server used for draft compliance testing at ETSI
-  IoT CoAP Plugtests. Erbium (Er) participated in Paris, France, March 2012 and
-  Sophia-Antipolis, France, November 2012 (configured for native).
+* update-client.c: The client. It registers to the server, requests a manifest and parses it, requests image data and calculates its checksum.
+* update-server.c: Registers the resources.
+* resources/res-register.c: Parses client information and creates a device profile.
+* resources/res-manifest.c: Encodes, encrypts, and sends the manifest used in the experiments.
+* resources/res-image.c: Encodes and encrypts generated data block by block.
 
 PRELIMINARIES
 -------------
 
-- Get the Copper (Cu) CoAP user-agent from
-  [https://addons.mozilla.org/en-US/firefox/addon/copper-270430](https://addons.mozilla.org/en-US/firefox/addon/copper-270430)
+- Two Firefly boards, one for the client and one for the server.
+- The Contiker docker image.
 
-TMOTE SKY HOWTO
----------------
-
-The CoAP example no longer fits in the limited ROM of the Tmote Sky.
-Please use a platform with larger ROM instead.
-
-NATIVE HOWTO
+ HOWTO
 ------------
 
-With the target native you can test your CoAP applications without
-constraints, i.e., with large buffers, debug output, memory protection, etc.
-The plugtest-server is thought for the native platform, as it requires
-an 1280-byte IP buffer and 1024-byte blocks.
-
-        make TARGET=native plugtest-server
-        sudo ./plugtest-server.native
-
-Open new terminal
-
-        make connect-native
-
-- Start Copper and discover resources at coap://[fdfd::ff:fe00:10]:5683/
-- You can enable the ETSI Plugtest menu in Copper's preferences
-
-Under Windows/Cygwin, WPCAP might need a patch in
-<cygwin>\usr\include\w32api\in6addr.h:
-
-    21,23c21
-    < #ifdef __INSIDE_CYGWIN__
-    <     uint32_t __s6_addr32[4];
-    < #endif
-    ---
-    >     u_int __s6_addr32[4];
-    36d33
-    < #ifdef __INSIDE_CYGWIN__
-    39d35
-    < #endif
+* Connect the Firefly boards, make sure they are connected to /dev/ttyUSB0 and /dev/ttyUSB1 (or change the run scripts).
+* Execute run-server.sh and run-client.sh.
 
 DETAILS
 -------
 
-Erbium implements the Proposed Standard of CoAP. Central features are commented
-in coap-example-server.c.  In general, coap supports:
-
-- All draft-18 header options
-- CON Retransmissions (note COAP_MAX_OPEN_TRANSACTIONS)
-- Blockwise Transfers (note COAP_MAX_CHUNK_SIZE, see plugtest-server.c for
-  Block1 uploads)
-- Separate Responses (no rest_set_pre_handler() required anymore, note
-  coap_separate_accept(), _reject(), and _resume())
-- Resource Discovery
-- Observing Resources (see EVENT_ and PERIODIC_RESOURCE, note
-  COAP_MAX_OBSERVERS)
+- Manifests are encrypted and decrypted all at once. Generated image data is encrypted and decrypted per CoAP block. COSE encryption adds 8 bytes of tag, meaning the ciphertext buffers must be 8 bytes larger than the plaintext buffers.
+- The client sends its credentials to the server as an URI-query. Disabling SICSLOWPAN_CONF_FRAG or reducing COAP_MAX_HEADER_SIZE in project-conf.h will require blockwise transfers from client to server instead, which is not solved.
 
 TODOs
 -----
 
-- Dedicated Observe buffers
-- Optimize message struct variable access (directly access struct without copying)
-- Observe client
-- Multiple If-Match ETags
-- (Message deduplication)
+- Generalize parser.
+- Thoroughly test parser.
+- Reduce memory usage of parser.
+- Setting DEBUG 1 (in general, printing a lot) in update-client.c re-orders stack so that the client might crash.
