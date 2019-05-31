@@ -45,7 +45,7 @@
 #include "rpl.h"
 #include "rpl-dag-root.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -70,7 +70,7 @@ PROCESS_THREAD(er_example_server, ev, data)
 
   PRINTF("Starting Erbium Example Server\n");
   PRINTF("uIP buffer: %u\n", UIP_BUFSIZE);
-  //PRINTF("LL header: %u\n", UIP_LLH_LEN);
+  PRINTF("LL header: %u\n", UIP_LLH_LEN);
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
   PRINTF("CoAP max chunk: %u\n", COAP_MAX_CHUNK_SIZE);
 
@@ -85,7 +85,7 @@ PROCESS_THREAD(er_example_server, ev, data)
    * WARNING: Activating twice only means alternate path, not two instances!
    * All static variables are the same for each URI path.
    */
-  coap_activate_resource(&res_hello, "test/hello");
+  //coap_activate_resource(&res_hello, "test/hello");
   coap_activate_resource(&res_register, "update/register");
   coap_activate_resource(&res_manifest, "update/manifest");
   coap_activate_resource(&res_image, "update/image");

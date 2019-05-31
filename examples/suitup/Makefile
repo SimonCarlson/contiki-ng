@@ -11,9 +11,8 @@ endif
 MODULES_REL += ./resources
 MODULES_REL += $(TARGET)
 
-MAKE_MAC = MAKE_MAC_TSCH
 # Include the CoAP implementation
-MODULES += os/net/app-layer/coap os/services/orchestra
+MODULES += os/net/app-layer/coap
 PROJECT_SOURCEFILES += opt-cose.c opt-cbor.c cose-aes-ccm.c
 MAKE_WITH_DTLS=1
 MAKE_COAP_DTLS_KEYSTORE=MAKE_COAP_DTLS_KEYSTORE_SIMPLE

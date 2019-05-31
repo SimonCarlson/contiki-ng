@@ -2,13 +2,12 @@
 #include <string.h>
 #include "cfs/cfs.h"
 #include "coap-engine.h"
-#include "sys/energest.h"
 
 #include "coap-log.h"
 #define LOG_MODULE "client"
 #define LOG_LEVEL  LOG_LEVEL_COAP
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 #include <stdio.h>
 #define PRINTF(...) printf(__VA_ARGS__)
@@ -35,21 +34,14 @@ static void
 res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("REGISTER RESOURCE\n");
-  uint64_t cpu_start, cpu_time, lpm_start, lpm_time, dlpm_start, dlpm_time, tx_start, tx_time, rx_start, rx_time;
-  energest_flush();
-  cpu_start = energest_type_time(ENERGEST_TYPE_CPU);
-  lpm_start = energest_type_time(ENERGEST_TYPE_LPM);
-  dlpm_start = energest_type_time(ENERGEST_TYPE_DEEP_LPM);
-  tx_start = energest_type_time(ENERGEST_TYPE_TRANSMIT);
-  rx_start = energest_type_time(ENERGEST_TYPE_LISTEN);
-  //char vendor_id[37];
-  //char class_id[37];
-  //char version[4];
-  const uint8_t *chunk;
+  char vendor_id[37];
+  char class_id[37];
+  char version[4];
+  const char *chunk;
 
-  coap_get_payload(request, &chunk);
+  coap_get_query_variable(request, "vid", &chunk);
   PRINTF("CHUNK: %s\n", chunk);
-  /*char *p1, *p2;
+  char *p1, *p2;
   // Find end of first argument
   p2 = strstr((char *)chunk, "&");
   memcpy(vendor_id, chunk, p2 - chunk);
@@ -76,16 +68,9 @@ res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   snprintf(profile_data, sizeof(profile_data), "%s\n%s\n%s\n", vendor_id, class_id, version);
   int fd = cfs_open("profile", CFS_WRITE);
   cfs_write(fd, profile_data, sizeof(profile_data));
-  cfs_close(fd);*/
+  cfs_close(fd);
 
 
   coap_set_status_code(response, CREATED_2_01);
   coap_set_header_content_format(response, TEXT_PLAIN); /* text/plain is the default, hence this option could be omitted. */
-  energest_flush();
-  cpu_time = energest_type_time(ENERGEST_TYPE_CPU) - cpu_start;
-  lpm_time = energest_type_time(ENERGEST_TYPE_LPM) - lpm_start;
-  dlpm_time = energest_type_time(ENERGEST_TYPE_DEEP_LPM) - dlpm_start;
-  tx_time = energest_type_time(ENERGEST_TYPE_TRANSMIT) - tx_start;
-  rx_time = energest_type_time(ENERGEST_TYPE_LISTEN) - rx_start;
-  printf("Register: CPU: %llus LPM: %llus DLPM: %llus TX: %llus RX: %llus\n", cpu_time, lpm_time, dlpm_time, tx_time, rx_time);
 }
