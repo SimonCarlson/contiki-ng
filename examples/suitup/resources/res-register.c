@@ -1,3 +1,10 @@
+/**
+ * \file
+ *      Software updates registration resource
+ * \author
+ *      Simon Carlson <scarlso@kth.se>
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include "cfs/cfs.h"
@@ -17,12 +24,6 @@
 
 static void res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 
-/*
- * A handler function named [resource name]_handler must be implemented for each RESOURCE.
- * A buffer for the response payload is provided through the buffer pointer. Simple resources can ignore
- * preferred_size and offset, but must respect the REST_MAX_CHUNK_SIZE limit for the buffer.
- * If a smaller block size is requested for CoAP, the REST framework automatically splits the data.
- */
 RESOURCE(res_register,
          "title=\"Update registration",
          res_register_handler,
@@ -34,11 +35,15 @@ static void
 res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
   PRINTF("REGISTER RESOURCE\n");
+  // Sizes of UUIDs are known, 36 bytes with one extra for null-termination
   char vendor_id[37];
   char class_id[37];
   char version[4];
   const char *chunk;
 
+  // Get the query variable and parse it into a device profile
+  // String is of format vid=VENDOR_ID&cid=CLASS_ID&v=VERSION
+  // Profile contains vendor ID, class ID, and version number
   coap_get_query_variable(request, "vid", &chunk);
   PRINTF("CHUNK: %s\n", chunk);
   char *p1, *p2;
@@ -66,10 +71,10 @@ res_register_handler(coap_message_t *request, coap_message_t *response, uint8_t 
 
   char profile_data[37 + 37 + 4 + 2];
   snprintf(profile_data, sizeof(profile_data), "%s\n%s\n%s\n", vendor_id, class_id, version);
+  // Write to file so manifest resource can access it
   int fd = cfs_open("profile", CFS_WRITE);
   cfs_write(fd, profile_data, sizeof(profile_data));
   cfs_close(fd);
-
 
   coap_set_status_code(response, CREATED_2_01);
   coap_set_header_content_format(response, TEXT_PLAIN); /* text/plain is the default, hence this option could be omitted. */

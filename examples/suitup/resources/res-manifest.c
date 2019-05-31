@@ -1,3 +1,10 @@
+/**
+ * \file
+ *      Software updates manifest resource
+ * \author
+ *      Simon Carlson <scarlso@kth.se>
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -23,8 +30,8 @@ RESOURCE(res_manifest,
          NULL,
          NULL,
          NULL);
-  
-//static char *manifest= "{\"0\": 1, \"1\": 1555415686, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3, \"1\": 704, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"8c2859fca075e24d1a79d0b6cdfdfe5c07da8c203a892700538efd96f789b355\"}]}, \"6\": [], \"7\": [], \"8\": []}";
+
+// Generated from the https://github.com/SimonCarlson/manifest-generator project
 static char *manifest = "{\"0\": 1, \"1\": 1556783337, \"2\": [{\"0\": 0, \"1\": \"4be0643f-1d98-573b-97cd-ca98a65347dd\"}, {\"0\": 1, \"1\": \"18ce9adf-9d2e-57a3-9374-076282f3d95b\"}], \"3\": [], \"4\": 0, \"5\": {\"0\": 3, \"1\": 11500, \"2\": 0, \"3\": [{\"0\": \"update/image\", \"1\": \"37ce827871e6c63e9e5aab92f84c579f7aa5c6be0c3980cb6e30a102396abfd6\"}]}, \"6\": [], \"7\": [], \"8\": []}";
 
 static void
@@ -40,12 +47,13 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
   uint8_t cose_buffer = 0;
   char *aad = "0011bbcc22dd44ee55ff660077"; // Chosen from RFC 8152
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};
-  static uint8_t ciphertext_buffer[332]; // +8 for tag-len
+  static uint8_t ciphertext_buffer[332]; // 8 longer than plaintext for tag
   PRINTF("MANIFEST RESOURCE\n");
 
   if(!transmit) {
     // Here the server would pick a manifest to encrypt and send depending on the
     // information in the profile
+    // Sizes of UUIDs and version IDs known
     char profile_data[37 + 37 + 4 + 2];
     int fd = cfs_open("profile", CFS_READ);
     cfs_read(fd, profile_data, sizeof(profile_data));
@@ -76,7 +84,7 @@ res_manifest_handler(coap_message_t *request, coap_message_t *response, uint8_t 
     PRINTF_HEX(buffer, preferred_size);
     PRINTF("\n");
   } else {
-    // Send the remaining data
+    // Send the remaining data and end block transfer
     memcpy((char *)buffer, (char *)cose.ciphertext + *offset, cose.ciphertext_len - *offset);
     PRINTF("SENDING: ");
     PRINTF_HEX(buffer, cose.ciphertext_len - *offset);

@@ -1,3 +1,10 @@
+/**
+ * \file
+ *      Software updates data generation resource
+ * \author
+ *      Simon Carlson <scarlso@kth.se>
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -24,7 +31,6 @@ RESOURCE(res_image,
          NULL);
 
 #define BLOCKS_TOTAL 10 // Each block is 32 bytes total, of which 24 is data, with one byte for null-termination
-#define SUITUP_COOJA
 
 static void res_image_handler(coap_message_t *request, coap_message_t *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
@@ -39,11 +45,11 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
   char *aad = "0011bbcc22dd44ee55ff660077"; // Chosen from RFC 8152
   uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};
   uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  uint8_t ciphertext_buffer[length + 8]; // +8 for tag-len
+  uint8_t ciphertext_buffer[length + 8]; // 8 longer than plaintext for tag
 
   PRINTF("BLOCK: %d\n", block);
   // Format some data into a buffer
-  // Casting it to avoid type error when compiling native vs on firefly
+  // Casting it to avoid type error when compiling native vs on Firefly
   int format = (int) *offset;
   snprintf((char*)data, 24, "|%d||%d||%d||%d||%d||%d||%d||%d|", format, format, format, format, format, format, format, format);
   PRINTF("Data plaintext: ");
@@ -67,6 +73,7 @@ static void res_image_handler(coap_message_t *request, coap_message_t *response,
 
   memcpy((char *)buffer, (char *)cose.ciphertext, 32);
   if(block >= BLOCKS_TOTAL) {
+    // Ends block transfer
     PRINTF("Setting end to 1\n");
     end = 1;
   }

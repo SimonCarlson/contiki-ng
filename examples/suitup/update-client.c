@@ -1,39 +1,8 @@
-/*
- * Copyright (c) 2013, Institute for Pervasive Computing, ETH Zurich
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the Institute nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * This file is part of the Contiki operating system.
- */
-
 /**
  * \file
- *      Erbium (Er) CoAP client example.
+ *      Software updates example client
  * \author
- *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
+ *      Simon Carlson <scarlso@kth.se>
  */
 
 #include <stdio.h>
@@ -49,11 +18,6 @@
 #include "opt-cose.h"
 #include "os/net/security/tinydtls/tinydtls.h"
 #include "os/net/security/tinydtls/sha2/sha2.h"
-
-/* Log configuration */
-#include "coap-log.h"
-#define LOG_MODULE "client"
-#define LOG_LEVEL  LOG_LEVEL_COAP
 
 #define SERVER_EP "coap://[fd00::212:4b00:9df:9096]"
 #define VENDOR_ID "4be0643f-1d98-573b-97cd-ca98a65347dd"
@@ -78,8 +42,11 @@ void printf_char(unsigned char*, unsigned int);
 #endif
 void printf_hex(unsigned char*, unsigned int);
 
+// Buffer to reassemble manifest in
 static char manifest_buffer[370];
+// To track state of buffer
 static int manifest_offset = 0;
+// Will be updated by the image callback and calculated after it returns control to main thread
 dtls_sha256_ctx ctx;
 
 struct value_t {
@@ -113,9 +80,11 @@ void printf_hex(unsigned char *data, unsigned int len){
 }
 
 void register_callback(coap_message_t *response) {
+    // Do nothing on register, just acknowledge
     PRINTF("REGISTER CALLBACK\n");
 }
 
+// This function reassembles the received manifest ciphertext
 void manifest_callback(coap_message_t *response) {
     PRINTF("MANIFEST CALLBACK\n");
     const uint8_t *chunk;
@@ -131,6 +100,7 @@ void manifest_callback(coap_message_t *response) {
     manifest_offset += 32;
 }
 
+// This function decrypts each block of the image data and updates the SHA256 context with the plaintext
 void image_callback(coap_message_t *response) {
     PRINTF("IMAGE CALLBACK\n");
     const uint8_t *chunk;
@@ -143,11 +113,11 @@ void image_callback(coap_message_t *response) {
     PRINTF("\n");
 
     opt_cose_encrypt_t decrypt;
-    char *aad2 = "0011bbcc22dd44ee55ff660077";
+    char *aad2 = "0011bbcc22dd44ee55ff660077";  // Chosen from RFC 8152
     uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
-    uint8_t decrypt_buffer2[24];
+    uint8_t decrypt_buffer2[24];    // Plaintext is 8 shorter than ciphertext because of tag
     uint8_t cipher[32];
 
     // Decrypt each block
@@ -180,7 +150,7 @@ void image_callback(coap_message_t *response) {
 }
 
 int manifest_checker(manifest_t *manifest) {
-    // Check pre conditions, directives in options etc
+    // Check pre conditions, directives, options etc
     // Here you can implement custom checking for your deployment
     if(strcmp(manifest->preConditions->value, VENDOR_ID) != 0) {
         PRINTF("Mismatched vendor ID.\n");
@@ -213,15 +183,14 @@ PROCESS_THREAD(update_client, ev, data) {
     while(!coap_endpoint_is_connected(&server_ep)) {
         etimer_set(&et, CLOCK_SECOND * INTERVAL);
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-        printf("Checking connection again.\n");
-        //coap_endpoint_connect(&server_ep);
+        printf("Waiting for connection.\n");
     }
     printf("Client connected.\n");
 
     // Register to well-known endpoint update/register
     coap_init_message(request, COAP_TYPE_CON, COAP_POST, 0);
     coap_set_header_uri_path(request, "update/register");
-    // Copy POST data into buffer for server to make profile of
+    // Copy POST data into buffer for server to make device profile of
     snprintf(query_data, sizeof(query_data) - 1, "?vid=%s&cid=%s&v=%s", VENDOR_ID, CLASS_ID, VERSION);
     coap_set_header_uri_query(request, query_data); 
 
@@ -243,8 +212,8 @@ PROCESS_THREAD(update_client, ev, data) {
 
     // Decode and decrypt manifest into plaintext
     opt_cose_encrypt_t decrypt;
-	char *aad2 = "0011bbcc22dd44ee55ff660077";
-	uint8_t decrypt_buffer[325];
+	char *aad2 = "0011bbcc22dd44ee55ff660077";  // Chosen from RFC 8152
+	uint8_t decrypt_buffer[325];    // One longer than plaintext to null-terminate
 	uint8_t key2[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 	uint8_t buffer2 = 0;
     uint8_t nonce[7] = {0, 1, 2, 3, 4, 5, 6};	
@@ -257,7 +226,7 @@ PROCESS_THREAD(update_client, ev, data) {
 	OPT_COSE_SetCiphertextBuffer(&decrypt, (uint8_t*)manifest_buffer, 332);
 	OPT_COSE_Decode(&decrypt, &buffer2, 1);
 	OPT_COSE_Decrypt(&decrypt, key2, 16);
-    // Null-terminate plaintext
+    // Null-terminate plaintext for parser
     decrypt_buffer[324] = 0;
 
     PRINTF("PLAINTEXT: %s\n", decrypt.plaintext);
@@ -285,6 +254,7 @@ PROCESS_THREAD(update_client, ev, data) {
     // Parse and check manifest
     manifest_parser(&manifest, (char *)decrypt.plaintext);
     print_manifest(&manifest);
+    // Check validity of manifest
     int accept = manifest_checker(&manifest);
     PRINTF("Accept: %d\n", accept);
     
@@ -338,6 +308,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
             case 2:
                 // PRECONDITIONS
                 // First pair (vendor id)
+                // Nested structures contain their own keys as described in the thesis, advance past them as well
                 key = get_next_key(&cur_pos);
                 val = get_next_value(&cur_pos);
                 manifest_p->preConditions->type = atoi(val);
@@ -437,7 +408,7 @@ void manifest_parser(manifest_t *manifest_p, char *manifest_string) {
 }
 
 uint8_t get_next_key(char **buffer) {
-    char check; // Will hold the candidate for the key value
+    char check; // Holds the candidate for the key value
 
     while(**buffer > 0) {
         check = (*buffer)[1];
